@@ -15,30 +15,32 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: "khoi.seller@gmail.com");
-  final _passwordController = TextEditingController(text: "password123");
+  final _emailController = TextEditingController(text: "seller1@tempmail.vn");
+  final _passwordController = TextEditingController(text: "admin123");
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
+  // --- HÀM ĐÃ ĐƯỢC CẬP NHẬT ĐỂ SỬA LỖI KHỰNG APP ---
   Future<void> _login() async {
     setState(() => _isLoading = true);
-
     final authProvider = context.read<AuthProvider>();
+
     final error = await authProvider.login(
       _emailController.text,
       _passwordController.text,
     );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (error != null) {
-        // Backend trả về "Tài khoản chưa kích hoạt" nếu chưa verify OTP
+ 
+    if (error != null) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error)));
       }
     }
+ 
   }
 
   @override

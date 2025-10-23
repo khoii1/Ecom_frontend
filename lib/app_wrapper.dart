@@ -13,7 +13,7 @@ class AppWrapper extends StatelessWidget {
 
     switch (authStatus) {
       case AuthStatus.authenticated:
-        return const HomeScreen();
+        return const MainScreenWrapper();
       case AuthStatus.unauthenticated:
         return const LoginScreen();
       case AuthStatus.unknown:

@@ -11,21 +11,23 @@ class AuthService {
         '/auth/login',
         data: {'email': email, 'password': password},
       );
+
       return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Lỗi đăng nhập');
     }
   }
 
+  // --- CẬP NHẬT HÀM NÀY ---
   Future<Map<String, dynamic>> register({
     required String fullName,
     required String email,
     required String password,
-    String role = 'USER',
+    required String role, // Thêm 'required'
   }) async {
     try {
       final response = await _dio.post(
-        '/auth/register', //
+        '/auth/register',
         data: {
           'fullName': fullName,
           'email': email,
@@ -39,13 +41,10 @@ class AuthService {
     }
   }
 
-  // <-- THÊM CÁC HÀM MỚI -->
-
-  // POST /auth/verify-email
   Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
     try {
       final response = await _dio.post(
-        '/auth/verify-email', //
+        '/auth/verify-email',
         data: {'email': email, 'code': code},
       );
       return response.data;
@@ -54,11 +53,10 @@ class AuthService {
     }
   }
 
-  // POST /auth/forgot-password
   Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
       final response = await _dio.post(
-        '/auth/forgot-password', //
+        '/auth/forgot-password',
         data: {'email': email},
       );
       return response.data;
@@ -67,7 +65,6 @@ class AuthService {
     }
   }
 
-  // POST /auth/reset-password
   Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String code,
@@ -75,7 +72,7 @@ class AuthService {
   }) async {
     try {
       final response = await _dio.post(
-        '/auth/reset-password', //
+        '/auth/reset-password',
         data: {'email': email, 'code': code, 'newPassword': newPassword},
       );
       return response.data;

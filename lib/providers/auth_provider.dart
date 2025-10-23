@@ -1,3 +1,5 @@
+import 'package:ecom_frontend/models/user.dart';
+import 'package:ecom_frontend/services/user_service.dart';
 import 'package:flutter/material.dart';
 import 'package:ecom_frontend/services/auth_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
@@ -7,6 +9,7 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final StorageService _storageService;
+  final UserService _userService;
 
   AuthStatus _authStatus = AuthStatus.unknown;
   AuthStatus get authStatus => _authStatus;
@@ -14,15 +17,25 @@ class AuthProvider extends ChangeNotifier {
   String? _accessToken;
   String? get accessToken => _accessToken;
 
-  AuthProvider(this._authService, this._storageService) {
-    _checkToken();
+  User? _currentUser;
+  User? get currentUser => _currentUser;
+
+  AuthProvider(this._authService, this._storageService, this._userService) {
+    _checkAuthStatus();
   }
 
-  Future<void> _checkToken() async {
+  Future<void> _checkAuthStatus() async {
+    // Chỉ cần kiểm tra access_token
     final token = await _storageService.readToken('access_token');
     if (token != null) {
       _accessToken = token;
-      _authStatus = AuthStatus.authenticated;
+      try {
+        _currentUser = await _userService.getMyProfile();
+        _authStatus = AuthStatus.authenticated;
+      } catch (e) {
+        await logout(); // Xóa token cũ nếu không hợp lệ
+        _authStatus = AuthStatus.unauthenticated;
+      }
     } else {
       _authStatus = AuthStatus.unauthenticated;
     }
@@ -31,46 +44,73 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> login(String email, String password) async {
     try {
-      final tokens = await _authService.login(email, password);
+      // API response chỉ chứa access_token
+      final responseData = await _authService.login(email, password);
 
-      _accessToken = tokens['access_token'];
-      await _storageService.saveToken('access_token', tokens['access_token']);
-      await _storageService.saveToken('refresh_token', tokens['refresh_token']);
+      final accessToken = responseData['access_token'];
 
-      _authStatus = AuthStatus.authenticated;
-      notifyListeners();
-      return null; // Thành công
+      // Chỉ kiểm tra access_token
+      if (accessToken is String) {
+        _accessToken = accessToken;
+
+        // Chỉ lưu access_token
+        await _storageService.saveToken('access_token', accessToken);
+        // Không lưu refresh_token nữa
+        // await _storageService.saveToken('refresh_token', refreshToken);
+
+        _currentUser = await _userService.getMyProfile();
+        _authStatus = AuthStatus.authenticated;
+        notifyListeners();
+        return null; // Đăng nhập thành công
+      } else {
+        // Nếu API không trả về access_token như mong đợi
+        throw Exception("API không trả về access_token hợp lệ.");
+      }
     } catch (e) {
       _authStatus = AuthStatus.unauthenticated;
+      _currentUser = null;
+      await _storageService.deleteAllTokens(); // Xóa hết token khi có lỗi
       notifyListeners();
-      return e.toString(); // Trả về lỗi
+      if (e is Exception && e.toString().contains('Sai thông tin đăng nhập')) {
+        return 'Sai thông tin đăng nhập hoặc tài khoản chưa kích hoạt.';
+      }
+      return e.toString();
     }
   }
 
-  // <-- CẬP NHẬT/THÊM HÀM MỚI -->
+  Future<void> logout() async {
+    // Chỉ cần xóa access_token (hoặc xóa hết cho chắc)
+    await _storageService.deleteAllTokens();
+    _accessToken = null;
+    _currentUser = null;
+    _authStatus = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
 
+  // --- Các hàm khác giữ nguyên ---
   Future<String?> register({
     required String fullName,
     required String email,
     required String password,
+    required String role,
   }) async {
     try {
-      // Backend sẽ gửi email OTP tại đây
       await _authService.register(
         fullName: fullName,
         email: email,
         password: password,
+        role: role,
       );
-      return null; // Đăng ký thành công
+      return null;
     } catch (e) {
-      return e.toString(); // Trả về lỗi
+      return e.toString();
     }
   }
 
   Future<String?> verifyEmail(String email, String code) async {
     try {
       await _authService.verifyEmail(email, code);
-      return null; // Xác thực thành công
+      return null;
     } catch (e) {
       return e.toString();
     }
@@ -78,9 +118,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> forgotPassword(String email) async {
     try {
-      // Backend sẽ gửi email OTP tại đây
       await _authService.forgotPassword(email);
-      return null; // Gửi yêu cầu thành công
+      return null;
     } catch (e) {
       return e.toString();
     }
@@ -97,16 +136,9 @@ class AuthProvider extends ChangeNotifier {
         code: code,
         newPassword: newPassword,
       );
-      return null; // Reset thành công
+      return null;
     } catch (e) {
       return e.toString();
     }
-  }
-
-  Future<void> logout() async {
-    await _storageService.deleteAllTokens();
-    _accessToken = null;
-    _authStatus = AuthStatus.unauthenticated;
-    notifyListeners();
   }
 }

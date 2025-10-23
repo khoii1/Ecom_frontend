@@ -26,7 +26,6 @@ class CartProvider extends ChangeNotifier {
     try {
       _cart = await _cartService.getMyCart();
     } catch (e) {
-      print(e.toString());
       // Có thể _cart = null;
     }
     _isLoading = false;
@@ -39,7 +38,6 @@ class CartProvider extends ChangeNotifier {
       // Sau khi thêm thành công, fetch lại toàn bộ giỏ hàng để đồng bộ
       await fetchCart();
     } catch (e) {
-      print(e.toString());
       // TODO: Hiển thị lỗi cho người dùng
     }
   }
@@ -49,7 +47,7 @@ class CartProvider extends ChangeNotifier {
       await _cartService.updateItem(cartItemId, qty);
       await fetchCart(); // Fetch lại để cập nhật tổng tiền
     } catch (e) {
-      print(e.toString());
+      // Error updating item quantity
     }
   }
 
@@ -58,7 +56,7 @@ class CartProvider extends ChangeNotifier {
       await _cartService.removeItem(cartItemId);
       await fetchCart(); // Fetch lại
     } catch (e) {
-      print(e.toString());
+      // Error adding item to cart
     }
   }
 
@@ -68,7 +66,7 @@ class CartProvider extends ChangeNotifier {
       _cart = null; // Xóa giỏ hàng ở local
       notifyListeners();
     } catch (e) {
-      print(e.toString());
+      // Error clearing cart
     }
   }
 }

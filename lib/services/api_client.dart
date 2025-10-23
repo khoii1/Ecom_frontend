@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
 import 'package:ecom_frontend/utils/app_config.dart';
 
@@ -22,11 +23,11 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException e, handler) async {
-          // Xử lý lỗi 401 (Token hết hạn) - (Phần này có thể làm sau)
-          // Bạn có thể gọi API /auth/refresh tại đây
+          // Xử lý lỗi 401 (Token hết hạn)
           if (e.response?.statusCode == 401) {
-            print("Token hết hạn, cần refresh");
-            // TODO: Gọi API refresh token
+            debugPrint("Token hết hạn, yêu cầu đăng nhập lại");
+            // Xóa token và chuyển về màn hình đăng nhập
+            await _storageService.deleteAllTokens();
           }
           return handler.next(e);
         },

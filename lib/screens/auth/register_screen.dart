@@ -20,28 +20,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  // --- THÊM MỚI: State để lưu role đã chọn ---
+  String _selectedRole = 'USER'; // Giá trị mặc định
+
   Future<void> _register() async {
     setState(() => _isLoading = true);
 
     final authProvider = context.read<AuthProvider>();
+    // --- CẬP NHẬT: Thêm role vào hàm register ---
     final error = await authProvider.register(
       fullName: _nameController.text,
       email: _emailController.text,
       password: _passwordController.text,
+      role: _selectedRole, // Lấy giá trị từ state
     );
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (error == null) {
-        // Đăng ký thành công, backend đã gửi OTP
-        // Chuyển sang màn hình xác thực
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => VerificationScreen(
               email: _emailController.text,
-              purpose:
-                  VerificationPurpose.verifyEmail, // Mục đích là xác thực email
+              purpose: VerificationPurpose.verifyEmail,
             ),
           ),
         );
@@ -100,6 +102,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
+
+            // --- THAY THẾ CustomTextField("Role") BẰNG DropdownButtonFormField ---
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Role",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: kTextColor,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedRole,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'USER',
+                      child: Text('User (Customer)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'SELLER',
+                      child: Text('Seller (Vendor)'),
+                    ),
+                  ],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedRole = newValue!;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(
+                      Icons.manage_accounts_outlined,
+                      color: kSecondaryTextColor,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: kPrimaryColor,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // --- KẾT THÚC THAY THẾ ---
+            const SizedBox(height: 20),
             CustomTextField(
               controller: _passwordController,
               labelText: "Password",
@@ -124,7 +186,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               isLoading: _isLoading,
             ),
             const SizedBox(height: 32),
-            // ... (Phần Social Login và link Đăng nhập) ...
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -134,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context); // Quay lại màn hình đăng nhập
+                    Navigator.pop(context);
                   },
                   child: const Text(
                     "Login",
