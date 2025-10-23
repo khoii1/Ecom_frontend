@@ -1,17 +1,137 @@
+import 'dart:convert'; // để decode base64 data URL
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/providers/cart_provider.dart';
 import 'package:ecom_frontend/providers/category_provider.dart';
 import 'package:ecom_frontend/providers/product_provider.dart';
-import 'package:ecom_frontend/screens/cart/cart_screen.dart'; // Vẫn cần để điều hướng từ AppBar
-import 'package:ecom_frontend/screens/search/search_screen.dart';
+import 'package:ecom_frontend/screens/cart/cart_screen.dart';
 import 'package:ecom_frontend/screens/product/product_detail_screen.dart';
-import 'package:ecom_frontend/screens/seller/add_product_screen.dart'; // Cần cho tab Add Product
+import 'package:ecom_frontend/screens/search/search_screen.dart';
+import 'package:ecom_frontend/screens/seller/add_product_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:async';
+
+// ===================== Countdown riêng (không rebuild toàn Home) =====================
+class CountdownTicker extends StatefulWidget {
+  final Duration initial;
+  const CountdownTicker({super.key, required this.initial});
+
+  @override
+  State<CountdownTicker> createState() => _CountdownTickerState();
+}
+
+class _CountdownTickerState extends State<CountdownTicker> {
+  late Duration _left;
+  late final Ticker _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _left = widget.initial;
+    _ticker = Ticker(_tick)..start();
+  }
+
+  void _tick(Duration _) {
+    if (!mounted) return;
+    if (_left.inSeconds <= 0) {
+      _ticker.stop();
+      return;
+    }
+    // chỉ rebuild mỗi 1 giây
+    final next = _left - const Duration(seconds: 1);
+    if (next.inSeconds != _left.inSeconds) {
+      setState(() => _left = next);
+    } else {
+      _left = next;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  List<String> _format(Duration d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return [
+      two(d.inHours),
+      two(d.inMinutes.remainder(60)),
+      two(d.inSeconds.remainder(60)),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = _format(_left);
+    return Row(
+      children: parts.asMap().entries.map((entry) {
+        final value = entry.value;
+        final isLast = entry.key == parts.length - 1;
+        return Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: kTextColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            if (!isLast)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0),
+                child: Text(
+                  ":",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+}
+
+// Ticker nhẹ không kéo theo SchedulerBinding (tránh thêm dependency)
+class Ticker {
+  Ticker(this.onTick);
+  final void Function(Duration elapsed) onTick;
+  bool _running = false;
+  Duration _elapsed = Duration.zero;
+
+  void start() {
+    if (_running) return;
+    _running = true;
+    _schedule();
+  }
+
+  void _schedule() async {
+    while (_running) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!_running) break;
+      _elapsed += const Duration(seconds: 1);
+      onTick(_elapsed);
+    }
+  }
+
+  void stop() => _running = false;
+  void dispose() => stop();
+}
+// ================================================================================
 
 // --- Widget chính giữ trạng thái các trang ---
 class MainScreenWrapper extends StatefulWidget {
@@ -24,13 +144,12 @@ class MainScreenWrapper extends StatefulWidget {
 class _MainScreenWrapperState extends State<MainScreenWrapper> {
   int _selectedIndex = 0; // Trang hiện tại được chọn (bắt đầu từ 0)
 
-  // --- DANH SÁCH WIDGET KHÔNG ĐỔI ---
   static List<Widget> _widgetOptions(BuildContext context) {
-    List<Widget> options = [
-      const HomeScreenContent(), // Trang Home (index 0)
-      const SearchScreen(), // Trang Search (index 1)
+    return [
+      const HomeScreenContent(), // Home (index 0)
+      const SearchScreen(), // Search (index 1)
       Scaffold(
-        // Trang Profile (index 2)
+        // Profile (index 2)
         appBar: AppBar(title: const Text('Profile')),
         body: Center(
           child: ElevatedButton(
@@ -40,52 +159,33 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
         ),
       ),
     ];
-    return options;
   }
-  // --- HẾT DANH SÁCH WIDGET ---
 
   void _onItemTapped(int index) {
     final userRole = context.read<AuthProvider>().currentUser?.role;
     final bool canAddProduct = userRole == 'ADMIN' || userRole == 'SELLER';
     int actualIndex = index;
 
-    // Logic xử lý khi nhấn tab
     if (canAddProduct) {
-      // Dành cho Admin/Seller
       if (index == 2) {
-        // Nhấn vào nút Add Product (+)
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AddProductScreen()),
         );
-        return; // Không đổi tab chính đang hiển thị
+        return;
       } else if (index > 2) {
-        // Nhấn vào Profile (index 3 trên UI)
-        actualIndex =
-            index - 1; // Index thực tế của Profile trong _widgetOptions là 2
+        actualIndex = index - 1; // Profile ở _widgetOptions là 2
       }
-      // index 0 -> Home (actualIndex 0)
-      // index 1 -> Search (actualIndex 1)
-    } else {
-      // Dành cho User thường (không có nút Add)
-      // index 0 -> Home (actualIndex 0)
-      // index 1 -> Search (actualIndex 1)
-      // index 2 -> Profile (actualIndex 2)
-      // actualIndex = index; // Không cần điều chỉnh
     }
 
-    // Cập nhật trang hiển thị nếu index hợp lệ và khác trang hiện tại
     if (actualIndex < _widgetOptions(context).length &&
         actualIndex != _selectedIndex) {
-      setState(() {
-        _selectedIndex = actualIndex;
-      });
+      setState(() => _selectedIndex = actualIndex);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- XÓA FLOATING ACTION BUTTON ---
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -96,11 +196,9 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
         _selectedIndex,
         _onItemTapped,
       ),
-      // floatingActionButton và floatingActionButtonLocation đã bị xóa
     );
   }
 
-  // --- Thanh điều hướng dưới cùng ---
   Widget _buildBottomNavBar(
     BuildContext context,
     int currentActualIndex,
@@ -111,60 +209,51 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
     );
     final bool canAddProduct = userRole == 'ADMIN' || userRole == 'SELLER';
 
-    // --- CẬP NHẬT DANH SÁCH ITEM (Thay Bag bằng Add) ---
-    final List<BottomNavigationBarItem> items = [
+    final items = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         activeIcon: Icon(Icons.home),
         label: 'Home',
-      ), // index 0
+      ),
       const BottomNavigationBarItem(
         icon: Icon(Icons.search_outlined),
         activeIcon: Icon(Icons.search),
         label: 'Search',
-      ), // index 1
-      // Nút Add Product (chỉ hiển thị cho Admin/Seller)
+      ),
       if (canAddProduct)
         const BottomNavigationBarItem(
-          icon: Icon(Icons.add_circle_outline, size: 28), // Icon dấu cộng
+          icon: Icon(Icons.add_circle_outline, size: 28),
           activeIcon: Icon(Icons.add_circle, size: 28),
           label: 'Add',
-        ), // index 2 (nếu có)
-      // Bỏ tab Giỏ hàng (Bag) ở đây
+        ),
       const BottomNavigationBarItem(
-        // Index 2 (nếu user) hoặc 3 (nếu admin/seller)
         icon: Icon(Icons.person_outline),
         activeIcon: Icon(Icons.person),
         label: 'Profile',
       ),
     ];
-    // --- HẾT CẬP NHẬT ITEM ---
 
-    // Điều chỉnh currentIndex hiển thị trên BottomNavigationBar
-    int displayIndex =
-        currentActualIndex; // Index của trang đang hiển thị (0, 1, 2)
+    int displayIndex = currentActualIndex;
     if (canAddProduct && currentActualIndex >= 2) {
-      // Nếu là admin/seller và đang ở trang Profile (index 2)
-      displayIndex = currentActualIndex + 1; // Index trên NavBar phải là 3
+      displayIndex = currentActualIndex + 1;
     }
 
-    // Bỏ BottomAppBar, trả về BottomNavigationBar đơn giản
     return BottomNavigationBar(
       items: items,
-      currentIndex: displayIndex, // Index trên NavBar
+      currentIndex: displayIndex,
       selectedItemColor: kPrimaryColor,
       unselectedItemColor: kSecondaryTextColor.withOpacity(0.7),
       showSelectedLabels: false,
       showUnselectedLabels: false,
-      type: BottomNavigationBarType.fixed, // Quan trọng khi item thay đổi
+      type: BottomNavigationBarType.fixed,
       backgroundColor: Colors.white,
       elevation: 8,
-      onTap: onTap, // Hàm onTap đã bao gồm logic điều hướng cho Add Product
+      onTap: onTap,
     );
   }
 }
 
-// --- Nội dung trang Home (HomeScreenContent) ---
+// --- Nội dung trang Home ---
 class HomeScreenContent extends StatefulWidget {
   const HomeScreenContent({super.key});
 
@@ -174,63 +263,76 @@ class HomeScreenContent extends StatefulWidget {
 
 class _HomeScreenContentState extends State<HomeScreenContent> {
   int _bannerCurrentIndex = 0;
-  // --- SỬA LỖI KHAI BÁO CONTROLLER ---
   final CarouselSliderController _carouselController =
       CarouselSliderController();
-  // --- KẾT THÚC SỬA LỖI ---
-  late Timer _timer;
-  Duration _countdownDuration = const Duration(
-    hours: 2,
-    minutes: 9,
-    seconds: 24,
-  );
+
+  // ===== Helper hiển thị ảnh từ URL thường hoặc data URL base64 =====
+  Widget _buildImageFromUrlOrBase64(
+    String? url, {
+    BoxFit fit = BoxFit.cover,
+    Widget? placeholder,
+    double? width,
+    double? height,
+  }) {
+    final Widget ph =
+        placeholder ??
+        Container(
+          color: Colors.grey[300],
+          child: const Icon(Icons.image_not_supported_outlined, size: 30),
+        );
+
+    if (url == null || url.isEmpty) return ph;
+
+    if (url.startsWith('data:image')) {
+      try {
+        final commaIndex = url.indexOf(',');
+        final base64Part = commaIndex != -1
+            ? url.substring(commaIndex + 1)
+            : url;
+        final bytes = base64Decode(base64Part);
+        return Image.memory(
+          bytes,
+          fit: fit,
+          width: width,
+          height: height,
+          gaplessPlayback: true, // tránh flash khi rebuild
+          errorBuilder: (c, e, s) => ph,
+        );
+      } catch (_) {
+        return ph;
+      }
+    }
+
+    return Image.network(
+      url,
+      fit: fit,
+      width: width,
+      height: height,
+      gaplessPlayback: true, // tránh flash khi rebuild
+      errorBuilder: (c, e, s) => ph,
+      loadingBuilder: (c, child, progress) {
+        if (progress == null) return child;
+        // tránh spinner lập lại gây cảm giác nhấp nháy khi parent rebuild nhẹ
+        return const SizedBox.shrink();
+      },
+    );
+  }
+  // =================================================================
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<ProductProvider>().fetchProducts();
-        context.read<CategoryProvider>().fetchCategories();
-        context.read<CartProvider>().fetchCart(); // Fetch giỏ hàng khi vào home
-      }
+      if (!mounted) return;
+      context.read<ProductProvider>().fetchProducts();
+      context.read<CategoryProvider>().fetchCategories();
+      context.read<CartProvider>().fetchCart();
     });
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          if (_countdownDuration.inSeconds > 0) {
-            _countdownDuration -= const Duration(seconds: 1);
-          } else {
-            _timer.cancel();
-          }
-        });
-      } else {
-        _timer.cancel();
-      }
-    });
-  }
-
-  List<String> _formatCountdown(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = twoDigits(duration.inHours);
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return [hours, minutes, seconds];
-  }
-
-  // --- AppBar Mới (Thêm Icon Giỏ hàng, bỏ Icon Trái tim) ---
+  // --- AppBar (Search + Cart badge + Notifications) ---
   AppBar _buildAppBar(BuildContext context) {
-    final cartProvider = context.watch<CartProvider>(); // Lấy cart provider
+    final cartProvider = context.watch<CartProvider>();
     return AppBar(
       backgroundColor: kBackgroundColor,
       elevation: 0,
@@ -240,7 +342,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         onTap: () {
           final wrapperState = context
               .findAncestorStateOfType<_MainScreenWrapperState>();
-          wrapperState?._onItemTapped(1); // Index 1 là trang Search
+          wrapperState?._onItemTapped(1); // sang tab Search
         },
         readOnly: true,
         decoration: InputDecoration(
@@ -275,9 +377,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         ),
       ),
       actions: [
-        // --- CẬP NHẬT: Icon Giỏ hàng (Thay thế Trái tim) ---
+        // --- Icon Giỏ hàng ---
         Stack(
-          alignment: Alignment.center, // Canh giữa badge và icon
+          alignment: Alignment.center,
           children: [
             IconButton(
               icon: Icon(
@@ -285,24 +387,21 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 color: kTextColor.withOpacity(0.7),
               ),
               onPressed: () {
-                // Điều hướng đến trang giỏ hàng
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CartScreen()),
                 );
               },
             ),
-            // Badge Count
             if (cartProvider.cart != null &&
                 cartProvider.cart!.items.isNotEmpty)
               Positioned(
-                // Đặt badge ở góc trên bên phải icon
                 right: 8,
                 top: 8,
                 child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: const BoxDecoration(
-                    color: kHeartColor, // Màu đỏ cho badge
+                    color: kHeartColor,
                     shape: BoxShape.circle,
                   ),
                   constraints: const BoxConstraints(
@@ -310,7 +409,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                     minHeight: 15,
                   ),
                   child: Text(
-                    // Hiển thị tổng số lượng sản phẩm trong giỏ
                     cartProvider.cart!.items
                         .fold<int>(0, (sum, item) => sum + item.qty)
                         .toString(),
@@ -321,9 +419,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
           ],
         ),
-        // --- HẾT CẬP NHẬT GIỎ HÀNG ---
-
-        // --- Icon Thông báo (Giữ nguyên) ---
+        // --- Icon Thông báo ---
         Stack(
           alignment: Alignment.topRight,
           children: [
@@ -333,7 +429,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 color: kTextColor.withOpacity(0.7),
               ),
               onPressed: () {
-                /* TODO: Navigate to Notifications */
+                /* TODO: Notifications */
               },
             ),
             Positioned(
@@ -347,7 +443,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 ),
                 constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
                 child: const Text(
-                  '3', // Số thông báo ví dụ
+                  '3',
                   style: TextStyle(color: Colors.white, fontSize: 9),
                   textAlign: TextAlign.center,
                 ),
@@ -360,20 +456,17 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     );
   }
 
-  // --- Các hàm build khác (_buildBannerCarousel, _buildSectionHeader, etc.) giữ nguyên ---
+  // --- Banner carousel ---
   Widget _buildBannerCarousel(BuildContext context) {
     final List<String> bannerImages = [
       'lib/assets/images/banner_1.jpg',
-      'lib/assets/images/banner_2.png',
+      'lib/assets/images/banner_2.jpg',
     ];
-    List<String> timeParts = _formatCountdown(_countdownDuration);
 
     return Column(
       children: [
         CarouselSlider(
-          // --- SỬA LỖI TYPE CONTROLLER ---
           carouselController: _carouselController,
-          // --- KẾT THÚC SỬA LỖI ---
           options: CarouselOptions(
             height: 180.0,
             autoPlay: true,
@@ -382,9 +475,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             enlargeCenterPage: false,
             enlargeFactor: 0.2,
             onPageChanged: (index, reason) {
-              setState(() {
-                _bannerCurrentIndex = index;
-              });
+              setState(() => _bannerCurrentIndex = index);
             },
           ),
           items: bannerImages.map((imgPath) {
@@ -407,6 +498,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           width: double.infinity,
                           height: double.infinity,
                           errorBuilder: (context, error, stackTrace) {
+                            // ignore: avoid_print
                             print("Lỗi tải ảnh banner: $imgPath, $error");
                             return const Center(
                               child: Icon(
@@ -439,8 +531,8 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
+                            children: const [
+                              Text(
                                 "New Year Sale",
                                 style: TextStyle(
                                   fontSize: 16,
@@ -448,8 +540,8 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              const Text(
+                              SizedBox(height: 6),
+                              Text(
                                 "40% off",
                                 style: TextStyle(
                                   fontSize: 26,
@@ -457,53 +549,14 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Spacer(),
-                              Row(
-                                children: timeParts
-                                    .asMap()
-                                    .entries
-                                    .map(
-                                      (entry) => Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(
-                                                0.9,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(5),
-                                            ),
-                                            child: Text(
-                                              entry.value,
-                                              style: const TextStyle(
-                                                color: kTextColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          if (entry.key < timeParts.length - 1)
-                                            const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 4.0,
-                                              ),
-                                              child: Text(
-                                                ":",
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    )
-                                    .toList(),
+                              Spacer(),
+                              // Đếm ngược chỉ tự rebuild chính nó -> không nhấp nháy ảnh
+                              CountdownTicker(
+                                initial: Duration(
+                                  hours: 2,
+                                  minutes: 9,
+                                  seconds: 24,
+                                ),
                               ),
                             ],
                           ),
@@ -519,20 +572,17 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: bannerImages.asMap().entries.map((entry) {
-            return GestureDetector(
-              onTap: () => _carouselController.animateToPage(entry.key),
-              child: Container(
-                width: 8.0,
-                height: 8.0,
-                margin: const EdgeInsets.symmetric(
-                  vertical: 10.0,
-                  horizontal: 4.0,
-                ),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kPrimaryColor.withOpacity(
-                    _bannerCurrentIndex == entry.key ? 0.9 : 0.3,
-                  ),
+            return Container(
+              width: 8.0,
+              height: 8.0,
+              margin: const EdgeInsets.symmetric(
+                vertical: 10.0,
+                horizontal: 4.0,
+              ),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kPrimaryColor.withOpacity(
+                  _bannerCurrentIndex == entry.key ? 0.9 : 0.3,
                 ),
               ),
             );
@@ -582,83 +632,105 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     );
   }
 
+  // --- Categories: DYNAMIC từ CategoryProvider (hỗ trợ ảnh base64/data URL) ---
   Widget _buildCategoriesSection(BuildContext context) {
-    List<Map<String, dynamic>> displayCategories = [
-      {'name': 'Man Style', 'image': 'lib/assets/images/category_man.png'},
-      {'name': 'Woman Style', 'image': 'lib/assets/images/category_woman.png'},
-      {'name': 'Kids Style', 'image': 'lib/assets/images/category_kids.jpg'},
-    ];
-
     return Column(
       children: [
         _buildSectionHeader("Categories", () {
           final wrapperState = context
               .findAncestorStateOfType<_MainScreenWrapperState>();
           wrapperState?._onItemTapped(1);
-          print("View all categories -> Navigate to Search Tab");
         }),
-        SizedBox(
-          height: 95,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(
-              horizontal: kDefaultPadding * 0.75,
-            ),
-            itemCount: displayCategories.length,
-            itemBuilder: (context, index) {
-              final category = displayCategories[index];
-              return GestureDetector(
-                onTap: () {
-                  print("Tapped category: ${category['name']}");
-                  /* TODO: Navigate to Search with filter */
-                },
-                child: Container(
-                  width: 85,
-                  margin: const EdgeInsets.only(right: kDefaultPadding * 0.75),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: kOffWhiteColor,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        height: 55,
-                        width: 55,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.asset(
-                            category['image'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  color: Colors.grey[300],
-                                  child: const Icon(
-                                    Icons.error_outline,
-                                    size: 30,
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        category['name'],
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: kTextColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+        Consumer<CategoryProvider>(
+          builder: (context, provider, child) {
+            if (provider.status == CategoryStatus.loading ||
+                provider.status == CategoryStatus.initial) {
+              return const SizedBox(
+                height: 95,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
                   ),
                 ),
               );
-            },
-          ),
+            }
+            if (provider.status == CategoryStatus.error) {
+              return SizedBox(
+                height: 95,
+                child: Center(
+                  child: Text(
+                    "Lỗi tải danh mục: ${provider.errorMessage ?? 'Unknown error'}",
+                  ),
+                ),
+              );
+            }
+            if (provider.categories.isEmpty) {
+              return const SizedBox(
+                height: 95,
+                child: Center(child: Text("Chưa có danh mục nào.")),
+              );
+            }
+
+            final cats = provider.categories;
+            return SizedBox(
+              height: 95,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: kDefaultPadding * 0.75,
+                ),
+                itemCount: cats.length,
+                itemBuilder: (context, index) {
+                  final cat = cats[index];
+                  return GestureDetector(
+                    onTap: () {
+                      final wrapperState = context
+                          .findAncestorStateOfType<_MainScreenWrapperState>();
+                      wrapperState?._onItemTapped(1);
+                    },
+                    child: Container(
+                      width: 85,
+                      margin: const EdgeInsets.only(
+                        right: kDefaultPadding * 0.75,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: kOffWhiteColor,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height: 55,
+                            width: 55,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: _buildImageFromUrlOrBase64(
+                                cat.imageUrl,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            cat.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: kTextColor,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
     );
@@ -668,7 +740,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     return Column(
       children: [
         _buildSectionHeader("Popular Product", () {
-          print("View all popular products"); /* TODO: Navigate */
+          /* TODO: Navigate */
         }),
         Consumer<ProductProvider>(
           builder: (context, provider, child) {
@@ -750,33 +822,18 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: product.imageUrl != null
-                            ? Image.network(
-                                product.imageUrl!,
-                                fit: BoxFit.contain,
-                                errorBuilder: (c, e, s) => const Center(
-                                  child: Icon(
-                                    Icons.error_outline,
-                                    color: kSecondaryTextColor,
-                                  ),
-                                ),
-                                loadingBuilder: (c, child, progress) {
-                                  if (progress == null) return child;
-                                  return const Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        kPrimaryColor,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                            : const Center(
+                        child:
+                            (product.imageUrl == null ||
+                                product.imageUrl!.isEmpty)
+                            ? const Center(
                                 child: Icon(
                                   Icons.image_not_supported_outlined,
                                   color: kSecondaryTextColor,
                                 ),
+                              )
+                            : _buildImageFromUrlOrBase64(
+                                product.imageUrl,
+                                fit: BoxFit.contain,
                               ),
                       ),
                     ),
@@ -861,8 +918,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               right: 8,
               child: GestureDetector(
                 onTap: () {
-                  print("Toggle favorite for ${product.title}");
-                  /* TODO: Implement favorite logic */
+                  /* TODO: Toggle favorite */
                 },
                 child: CircleAvatar(
                   radius: 16,
@@ -891,10 +947,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
           await Future.wait([
             context.read<ProductProvider>().fetchProducts(),
             context.read<CategoryProvider>().fetchCategories(),
-            if (mounted)
-              context
-                  .read<CartProvider>()
-                  .fetchCart(), // Fetch lại cart khi refresh
+            context.read<CartProvider>().fetchCart(),
           ]);
         },
         color: kPrimaryColor,

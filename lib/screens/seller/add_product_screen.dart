@@ -393,7 +393,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // Widget TextFormField chuẩn - giữ nguyên
   Widget _buildTextField({
-    // ... code giữ nguyên ...
     required TextEditingController controller,
     required String labelText,
     required String hintText,
