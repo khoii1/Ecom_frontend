@@ -10,6 +10,10 @@ import 'package:ecom_frontend/widgets/primary_button.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+// SỬA: Thêm 2 import
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({super.key});
 
@@ -105,17 +109,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
       if (pickedFile != null) {
-        // Copy file to app directory để tránh bị xóa
+        // --- SỬA: Thay đổi toàn bộ khối này ---
+
+        // 1. Đọc dữ liệu ảnh
         final bytes = await pickedFile.readAsBytes();
-        final tempDir = Directory.systemTemp;
-        final tempFile = File(
-          '${tempDir.path}/temp_image_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-        await tempFile.writeAsBytes(bytes);
+
+        // 2. Lấy thư mục LƯU TRỮ (persistent) của ứng dụng
+        final appDir = await getApplicationDocumentsDirectory();
+
+        // 3. Tạo đường dẫn và tên tệp mới
+        final fileName =
+            'temp_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        // Dùng p.join để ghép đường dẫn an toàn (thay vì dùng /)
+        final persistentFile = File(p.join(appDir.path, fileName));
+
+        // 4. Ghi dữ liệu ảnh vào tệp mới
+        await persistentFile.writeAsBytes(bytes);
 
         setState(() {
-          _selectedImage = tempFile;
+          // 5. Lưu tệp mới (tệp này sẽ không bị xóa)
+          _selectedImage = persistentFile;
         });
+
+        // --- HẾT PHẦN SỬA ---
       }
     } catch (e) {
       print('Lỗi chọn ảnh: $e');
@@ -168,7 +184,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           throw Exception("Chưa chọn ảnh sản phẩm");
         }
 
+        // SỬA: Logic kiểm tra file tồn tại của bạn đã đúng.
+        // Giờ đây nó sẽ luôn tìm thấy file vì chúng ta đã lưu vào
+        // thư mục persistent.
         if (!await _selectedImage!.exists()) {
+          // Lỗi này không nên xảy ra nữa
           throw Exception("File ảnh không tồn tại hoặc đã bị xóa");
         }
 

@@ -13,7 +13,7 @@ class Store {
 
   factory Store.fromJson(Map<String, dynamic> json) {
     return Store(
-      id: json['id'],
+      id: json['id'].toString(),
       ownerId: json['owner_id'],
       name: json['name'],
       status: json['status'],

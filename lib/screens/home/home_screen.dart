@@ -11,6 +11,7 @@ import 'package:ecom_frontend/screens/search/search_screen.dart';
 import 'package:ecom_frontend/screens/seller/add_product_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // <<< THÊM import intl
 import 'package:provider/provider.dart';
 
 // ===================== Countdown riêng (không rebuild toàn Home) =====================
@@ -266,6 +267,12 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   final CarouselSliderController _carouselController =
       CarouselSliderController();
 
+  final NumberFormat currencyFormatter = NumberFormat.currency(
+    locale: 'vi_VN',
+    symbol: '₫',
+    decimalDigits: 0, // Bỏ phần thập phân
+  );
+
   // ===== Helper hiển thị ảnh từ URL thường hoặc data URL base64 =====
   Widget _buildImageFromUrlOrBase64(
     String? url, {
@@ -312,8 +319,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       errorBuilder: (c, e, s) => ph,
       loadingBuilder: (c, child, progress) {
         if (progress == null) return child;
-        // tránh spinner lập lại gây cảm giác nhấp nháy khi parent rebuild nhẹ
-        return const SizedBox.shrink();
+        return const SizedBox.shrink(); // Tạm ẩn loading để tránh nháy
       },
     );
   }
@@ -498,7 +504,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           width: double.infinity,
                           height: double.infinity,
                           errorBuilder: (context, error, stackTrace) {
-                            // ignore: avoid_print
                             print("Lỗi tải ảnh banner: $imgPath, $error");
                             return const Center(
                               child: Icon(
@@ -550,7 +555,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                 ),
                               ),
                               Spacer(),
-                              // Đếm ngược chỉ tự rebuild chính nó -> không nhấp nháy ảnh
                               CountdownTicker(
                                 initial: Duration(
                                   hours: 2,
@@ -632,7 +636,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     );
   }
 
-  // --- Categories: DYNAMIC từ CategoryProvider (hỗ trợ ảnh base64/data URL) ---
   Widget _buildCategoriesSection(BuildContext context) {
     return Column(
       children: [
@@ -776,7 +779,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               ),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.68,
+                childAspectRatio: 0.68, // Điều chỉnh tỷ lệ này nếu cần
                 crossAxisSpacing: kDefaultPadding * 0.75,
                 mainAxisSpacing: kDefaultPadding * 0.75,
               ),
@@ -792,36 +795,58 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
     );
   }
 
+  // --- SỬA: Hàm xây dựng Card sản phẩm phổ biến ---
   Widget _buildPopularProductCard(BuildContext context, Product product) {
+    bool hasDiscount =
+        product.discountPercentage != null && product.discountPercentage! > 0;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: product),
+            builder: (_) => ProductDetailScreen(productId: product.id),
           ),
         );
       },
       child: Container(
         decoration: BoxDecoration(
-          color: kOffWhiteColor,
+          color: Colors.white, // Nền trắng thay vì kOffWhite
           borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
+          ), // Thêm viền nhẹ
+          boxShadow: [
+            // Thêm đổ bóng nhẹ
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Stack(
+        child: Column(
+          // Dùng Column thay vì Stack để dễ căn chỉnh text
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        top: kDefaultPadding,
-                        left: kDefaultPadding,
-                        right: kDefaultPadding,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
+            // --- Phần ảnh ---
+            Expanded(
+              flex: 3, // Ảnh chiếm nhiều không gian hơn
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ), // Bo góc trên
+                child: Stack(
+                  // Stack để đặt badge giảm giá lên ảnh
+                  children: [
+                    Center(
+                      // Căn giữa ảnh
+                      child: Padding(
+                        padding: const EdgeInsets.all(
+                          kDefaultPadding / 2,
+                        ), // Padding nhỏ quanh ảnh
                         child:
                             (product.imageUrl == null ||
                                 product.imageUrl!.isEmpty)
@@ -829,113 +854,136 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                 child: Icon(
                                   Icons.image_not_supported_outlined,
                                   color: kSecondaryTextColor,
+                                  size: 40,
                                 ),
                               )
                             : _buildImageFromUrlOrBase64(
                                 product.imageUrl,
-                                fit: BoxFit.contain,
+                                fit: BoxFit
+                                    .contain, // Contain để thấy rõ sản phẩm
                               ),
                       ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(kDefaultPadding * 0.75),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: kTextColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text:
-                                      "\$${product.finalPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: kTextColor,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (product.discountPercentage != null &&
-                                    product.discountPercentage! > 0)
-                                  WidgetSpan(
-                                    alignment: PlaceholderAlignment.middle,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '-${product.discountPercentage!.toInt()}%',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                    // Discount Badge (nếu có)
+                    if (hasDiscount)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: kHeartColor.withOpacity(0.9), // Màu badge
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '-${product.discountPercentage!.toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (product.rating != null)
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: Colors.amber,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  product.rating!.toStringAsFixed(1),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            // --- Phần thông tin (Tên, Giá, Rating) ---
+            Expanded(
+              flex: 2, // Thông tin chiếm ít không gian hơn
+              child: Padding(
+                padding: const EdgeInsets.all(kDefaultPadding * 0.75),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // SỬA: Bỏ mainAxisAlignment.spaceBetween để các widget gần nhau hơn
+                  // mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Tên sản phẩm
+                    Text(
+                      product.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: kTextColor,
+                      ),
+                      maxLines: 2, // Cho phép 2 dòng
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // SỬA: Giảm khoảng cách SizedBox
+                    const SizedBox(height: 4), // <<< Giảm chiều cao ở đây
+                    // --- KẾT THÚC SỬA ---
+                    // Hàng Giá và Rating
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.end, // Căn đáy cho đẹp
+                      children: [
+                        // --- SỬA: Hiển thị giá gốc và giá mới ---
+                        Column(
+                          // Dùng Column để giá gốc ở trên, giá mới ở dưới
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Giá mới (luôn hiển thị)
+                            Text(
+                              currencyFormatter.format(
+                                product.finalPrice ?? product.price,
+                              ),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: kBrownDark, // Màu giá chính
+                                fontSize: 16,
+                              ),
+                              maxLines: 1,
+                            ),
+                            // Giá gốc (chỉ hiển thị nếu có giảm giá)
+                            if (hasDiscount)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 2.0,
+                                ), // Khoảng cách nhỏ giữa 2 giá
+                                child: Text(
+                                  currencyFormatter.format(product.price),
                                   style: const TextStyle(
-                                    fontSize: 13,
-                                    color: kTextColor,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12, // Nhỏ hơn giá mới
+                                    color: kSecondaryTextColor,
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationColor: kHeartColor,
+                                    decorationThickness: 1.5,
                                   ),
                                 ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () {
-                  /* TODO: Toggle favorite */
-                },
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.white.withOpacity(0.8),
-                  child: Icon(
-                    Icons.favorite_border,
-                    color: kSecondaryTextColor.withOpacity(0.6),
-                    size: 18,
-                  ),
+                              ),
+                          ],
+                        ),
+                        // --- KẾT THÚC SỬA ---
+
+                        // Rating (nếu có)
+                        if (product.rating != null)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: kStarColor,
+                                size: 16,
+                              ), // Kích thước sao nhỏ hơn
+                              const SizedBox(width: 3),
+                              Text(
+                                product.rating!.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 12, // Kích thước rating nhỏ hơn
+                                  color: kTextColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -944,6 +992,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       ),
     );
   }
+  // --- KẾT THÚC SỬA ---
 
   @override
   Widget build(BuildContext context) {
