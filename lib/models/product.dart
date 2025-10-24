@@ -4,7 +4,8 @@ class Product {
   final String title;
   final String? categoryId;
   final double price;
-  final double? discountedPrice;
+  final double? discountPercentage; 
+  final double? finalPrice;         
   final double? rating;
   final String? imageUrl;
   final String status;
@@ -15,7 +16,8 @@ class Product {
     required this.title,
     this.categoryId,
     required this.price,
-    this.discountedPrice,
+    this.discountPercentage,  
+    this.finalPrice,         
     this.rating,
     this.imageUrl,
     required this.status,
@@ -28,8 +30,11 @@ class Product {
       title: json['title'],
       categoryId: json['category_id'],
       price: double.tryParse(json['price'].toString()) ?? 0.0,
-      discountedPrice: json['discounted_price'] != null
-          ? double.tryParse(json['discounted_price'].toString())
+      discountPercentage: json['discount_percentage'] != null  
+          ? double.tryParse(json['discount_percentage'].toString())
+          : null,
+      finalPrice: json['final_price'] != null                  
+          ? double.tryParse(json['final_price'].toString())
           : null,
       rating: json['rating'] != null
           ? double.tryParse(json['rating'].toString())

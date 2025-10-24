@@ -225,8 +225,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // --- Widget Card cho Sản phẩm (Giống HomeScreenContent) ---
   Widget _buildPopularProductCard(BuildContext context, Product product) {
-    bool isFavorite = false; // TODO: Lấy trạng thái yêu thích thực tế
-
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -311,7 +309,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         radius: 16,
                         backgroundColor: Colors.white.withOpacity(0.8),
                         child: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          Icons.favorite_border,
                           color: kHeartColor,
                           size: 18,
                         ),
@@ -340,12 +338,42 @@ class _SearchScreenState extends State<SearchScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "\$${product.discountedPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: kPrimaryColor,
-                          fontSize: 15,
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text:
+                                  "\$${product.finalPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: kPrimaryColor,
+                                fontSize: 15,
+                              ),
+                            ),
+                            if (product.discountPercentage != null &&
+                                product.discountPercentage! > 0)
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '-${product.discountPercentage!.toInt()}%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       if (product.rating != null)
@@ -369,18 +397,6 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                     ],
                   ),
-                  if (product.discountedPrice != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2.0),
-                      child: Text(
-                        "\$${product.price.toStringAsFixed(2)}",
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: kSecondaryTextColor,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),

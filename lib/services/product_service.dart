@@ -41,9 +41,9 @@ class ProductService {
     required String storeId,
     required String title,
     required double price,
-    String? description, // <-- THÊM MỚI
-    double? discountedPrice, // <-- THÊM MỚI
-    String? categoryId, // <-- THÊM MỚI
+    String? description,
+    double? discountPercentage,
+    String? categoryId,
     String? imageUrl,
   }) async {
     try {
@@ -52,13 +52,13 @@ class ProductService {
         'title': title,
         'price': price,
         if (description != null && description.isNotEmpty)
-          'description': description, // <-- THÊM MỚI
-        if (discountedPrice != null)
-          'discounted_price': discountedPrice, // <-- THÊM MỚI
+          'description': description,
+        if (discountPercentage != null)
+          'discount_percentage': discountPercentage,
         if (categoryId != null && categoryId.isNotEmpty)
-          'category_id': categoryId, // <-- THÊM MỚI
+          'category_id': categoryId,
         if (imageUrl != null) 'image_url': imageUrl,
-        'status': 'active', // Mặc định là active
+        'status': 'active',
       };
 
       final response = await _dio.post('/products', data: productData);

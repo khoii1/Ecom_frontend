@@ -863,25 +863,33 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                               children: [
                                 TextSpan(
                                   text:
-                                      "\$${product.discountedPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
+                                      "\$${product.finalPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: kTextColor,
                                     fontSize: 16,
                                   ),
                                 ),
-                                if (product.discountedPrice != null)
-                                  TextSpan(
-                                    text:
-                                        " \$${product.price.toStringAsFixed(2)}",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: kSecondaryTextColor.withOpacity(
-                                        0.8,
+                                if (product.discountPercentage != null &&
+                                    product.discountPercentage! > 0)
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
                                       ),
-                                      decoration: TextDecoration.lineThrough,
-                                      decorationColor: kSecondaryTextColor
-                                          .withOpacity(0.8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '-${product.discountPercentage!.toInt()}%',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
                               ],

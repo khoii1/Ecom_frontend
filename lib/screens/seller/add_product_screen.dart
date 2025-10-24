@@ -21,7 +21,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
-  final _discountedPriceController = TextEditingController();
+  final _discountPercentageController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   File? _selectedImage;
@@ -198,8 +198,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
         description: _descriptionController.text.isNotEmpty
             ? _descriptionController.text
             : null,
-        discountedPrice: _discountedPriceController.text.isNotEmpty
-            ? double.tryParse(_discountedPriceController.text)
+        discountPercentage: _discountPercentageController.text.isNotEmpty
+            ? double.tryParse(_discountPercentageController.text)
             : null,
         categoryId: _selectedCategory?.id,
         imageUrl: imageUrl,
@@ -292,20 +292,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                     const SizedBox(height: kDefaultPadding),
                     _buildTextField(
-                      controller: _discountedPriceController,
-                      labelText: "Giá giảm giá (Nếu có)",
-                      hintText: "Nhập giá sau khi giảm (VND)",
-                      prefixIcon: Icons.trending_down,
+                      controller: _discountPercentageController,
+                      labelText: "Phần trăm giảm giá (%)",
+                      hintText: "Nhập % giảm giá (0-100)",
+                      prefixIcon: Icons.percent,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value != null && value.isNotEmpty) {
-                          final price = double.tryParse(_priceController.text);
-                          final discounted = double.tryParse(value);
-                          if (discounted == null || discounted < 0) {
-                            return 'Giá giảm giá không hợp lệ (phải là số >= 0)';
-                          }
-                          if (price != null && discounted > price) {
-                            return 'Giá giảm giá phải nhỏ hơn hoặc bằng giá gốc';
+                          final percentage = double.tryParse(value);
+                          if (percentage == null ||
+                              percentage < 0 ||
+                              percentage > 100) {
+                            return 'Phần trăm giảm giá phải từ 0-100';
                           }
                         }
                         return null;
