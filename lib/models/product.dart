@@ -1,6 +1,6 @@
 // SỬA: Import file chứa hàm parseDouble (giả sử là parsers.dart)
 // Hoặc import cart_item.dart nếu bạn đặt hàm parse ở đó
-import 'parsers.dart'; // <<< THÊM HOẶC THAY ĐỔI IMPORT NÀY
+import 'parsers.dart'; 
 
 class Product {
   final String id;

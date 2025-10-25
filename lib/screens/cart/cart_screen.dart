@@ -4,34 +4,39 @@ import 'package:ecom_frontend/providers/cart_provider.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:ecom_frontend/services/stripe_service.dart';
+// <<< THÊM IMPORT OrderService và Order >>>
+import 'package:ecom_frontend/services/order_service.dart';
+import 'package:ecom_frontend/models/order.dart';
 
 class CartScreen extends StatelessWidget {
-  // Bỏ const vì có currencyFormatter
   CartScreen({super.key});
 
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
-    symbol: 'đ',
+    symbol: '₫',
     decimalDigits: 0,
   );
 
   @override
   Widget build(BuildContext context) {
+    // Dùng Consumer để chỉ rebuild khi CartProvider thay đổi
     return Consumer<CartProvider>(
       builder: (context, cartProvider, child) {
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: kPrimaryColor,
-            foregroundColor: Colors.white,
-            leading: const BackButton(color: Colors.white),
+            // backgroundColor: kPrimaryColor, // AppBar đã có màu nâu từ theme
+            // foregroundColor: Colors.white,
+            leading: const BackButton(
+              /*color: Colors.white*/
+            ), // Màu icon lấy từ theme
             title: const Text("Giỏ hàng của tôi"),
             actions: [
               if (cartProvider.cart != null &&
                   cartProvider.cart!.items.isNotEmpty)
                 IconButton(
                   icon: const Icon(
-                    Icons.delete_sweep_outlined,
-                    color: Colors.white,
+                    Icons.delete_sweep_outlined /*, color: Colors.white*/,
                   ),
                   tooltip: "Xóa tất cả",
                   onPressed: () => _confirmClearCart(context, cartProvider),
@@ -45,13 +50,17 @@ class CartScreen extends StatelessWidget {
     );
   }
 
+  // Hàm hiển thị dialog xác nhận xóa tất cả
   Future<void> _confirmClearCart(
     BuildContext context,
     CartProvider cartProvider,
   ) async {
+    // Sử dụng context.mounted để kiểm tra an toàn hơn
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
+        // Dùng dialogContext riêng
         return AlertDialog(
           title: const Text('Xác nhận xóa'),
           content: const Text(
@@ -60,21 +69,23 @@ class CartScreen extends StatelessWidget {
           actions: <Widget>[
             TextButton(
               child: const Text('Hủy'),
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: kHeartColor),
               child: const Text('Xóa'),
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
             ),
           ],
         );
       },
     );
 
-    if (confirmed == true) {
+    // Kiểm tra mounted sau await
+    if (confirmed == true && context.mounted) {
       try {
         await cartProvider.clearCart();
+        // Kiểm tra mounted lần nữa trước khi dùng context
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -97,6 +108,7 @@ class CartScreen extends StatelessWidget {
   }
 
   Widget _buildBody(BuildContext context, CartProvider cartProvider) {
+    // Kiểm tra trạng thái từ CartProvider
     if (cartProvider.status == CartStatus.loading &&
         cartProvider.cart == null) {
       return const Center(
@@ -113,8 +125,10 @@ class CartScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const Icon(Icons.error_outline, color: kHeartColor, size: 60),
+              const SizedBox(height: kDefaultPadding),
               Text(
-                "Lỗi tải giỏ hàng: ${cartProvider.errorMessage ?? 'Unknown error'}",
+                "Lỗi tải giỏ hàng:\n${cartProvider.errorMessage ?? 'Unknown error'}",
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: kHeartColor),
               ),
@@ -134,6 +148,7 @@ class CartScreen extends StatelessWidget {
       );
     }
 
+    // Nếu không loading, không lỗi, nhưng giỏ hàng trống
     if (cartProvider.cart == null || cartProvider.cart!.items.isEmpty) {
       return Center(
         child: Column(
@@ -168,6 +183,7 @@ class CartScreen extends StatelessWidget {
       );
     }
 
+    // Nếu có giỏ hàng
     final cart = cartProvider.cart!;
 
     return RefreshIndicator(
@@ -176,6 +192,7 @@ class CartScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(kDefaultPadding),
         children: [
+          // Hiển thị danh sách sản phẩm
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -184,10 +201,15 @@ class CartScreen extends StatelessWidget {
               final item = cart.items[index];
               return _buildCartItem(context, item, cartProvider);
             },
-            separatorBuilder: (context, index) =>
-                const Divider(height: kDefaultPadding * 1.5, thickness: 1),
+            separatorBuilder: (context, index) => const Divider(
+              height: kDefaultPadding * 1.5,
+              thickness: 1,
+              color: kOffWhiteColor,
+            ), // Màu divider nhạt hơn
           ),
           const SizedBox(height: kDefaultPadding * 1.5),
+
+          // Phần Promo Code
           const Text(
             "Mã giảm giá",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -197,27 +219,7 @@ class CartScreen extends StatelessWidget {
             children: [
               const Expanded(
                 child: TextField(
-                  decoration: InputDecoration(
-                    hintText: "Nhập mã giảm giá",
-                    filled: true,
-                    fillColor: kOffWhiteColor,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide(color: kPrimaryColor, width: 1.5),
-                    ),
-                  ),
+                  decoration: InputDecoration(hintText: "Nhập mã giảm giá"),
                 ),
               ),
               const SizedBox(width: 10),
@@ -225,48 +227,51 @@ class CartScreen extends StatelessWidget {
                 onPressed: () {
                   /* TODO: Apply promo code */
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                ),
                 child: const Text("Áp dụng"),
               ),
             ],
           ),
-          const SizedBox(height: kDefaultPadding * 2),
+          const SizedBox(height: kDefaultPadding * 2), // Khoảng trống cuối
         ],
       ),
     );
   }
 
-  // --- SỬA: Cập nhật _buildCartItem ---
+  // Widget hiển thị một item trong giỏ hàng
   Widget _buildCartItem(
     BuildContext context,
     CartItem item,
     CartProvider cartProvider,
   ) {
     return Dismissible(
-      key: Key(item.id), // Key phải là duy nhất cho mỗi item
+      key: ValueKey(item.id), // Key quan trọng cho Dismissible
       direction: DismissDirection.endToStart,
-      onDismissed: (direction) {
-        cartProvider.removeFromCart(item.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã xóa "${item.title}"'),
-            action: SnackBarAction(
-              label: "Hoàn tác",
-              onPressed: () =>
-                  cartProvider.fetchCart(force: true), // Re-fetch để hoàn tác
-            ),
-          ),
-        );
+      onDismissed: (direction) async {
+        // Thêm async
+        try {
+          await cartProvider.removeFromCart(item.id);
+          // Kiểm tra mounted trước khi dùng context
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Đã xóa "${item.title}"'),
+                // action: SnackBarAction( // Tạm bỏ Hoàn tác cho đơn giản
+                //    label: "Hoàn tác",
+                //    onPressed: () => cartProvider.fetchCart(force: true),
+                // ),
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Lỗi xóa sản phẩm: $e'),
+                backgroundColor: kHeartColor,
+              ),
+            );
+          }
+        }
       },
       background: Container(
         color: kHeartColor.withOpacity(0.8),
@@ -277,8 +282,7 @@ class CartScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
         child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.start, // Căn trên để nút số lượng thẳng hàng
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- Ảnh Sản Phẩm ---
             ClipRRect(
@@ -287,11 +291,10 @@ class CartScreen extends StatelessWidget {
                 width: 80,
                 height: 80,
                 color: kOffWhiteColor,
-                // SỬA: Hiển thị ảnh thật
                 child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
                     ? Image.network(
                         item.imageUrl!,
-                        fit: BoxFit.cover, // Cover để lấp đầy
+                        fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             const Icon(
                               Icons.error_outline,
@@ -312,7 +315,6 @@ class CartScreen extends StatelessWidget {
                         size: 40,
                         color: kSecondaryTextColor,
                       ),
-                // --- KẾT THÚC SỬA ---
               ),
             ),
             const SizedBox(width: 12),
@@ -331,10 +333,8 @@ class CartScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // const Text( "Color: Silver", style: TextStyle(color: kSecondaryTextColor)), // Placeholder nếu có variant
-                  // SỬA: Hiển thị giá cuối (finalPrice) nếu có, kèm giá gốc gạch ngang
+                  // Hiển thị giá cuối (finalPrice) nếu có, kèm giá gốc gạch ngang
                   Row(
-                    // Đặt giá mới và giá cũ cạnh nhau
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
@@ -348,17 +348,14 @@ class CartScreen extends StatelessWidget {
                           fontSize: 16,
                         ),
                       ),
-                      // Hiển thị giá gốc gạch ngang nếu có giảm giá
                       if (item.discountPercentage != null &&
                           item.discountPercentage! > 0)
                         Padding(
-                          padding: const EdgeInsets.only(
-                            left: 8.0,
-                          ), // Khoảng cách
+                          padding: const EdgeInsets.only(left: 8.0),
                           child: Text(
                             currencyFormatter.format(item.price),
                             style: const TextStyle(
-                              fontSize: 13, // Nhỏ hơn
+                              fontSize: 13,
                               color: kSecondaryTextColor,
                               decoration: TextDecoration.lineThrough,
                             ),
@@ -366,7 +363,6 @@ class CartScreen extends StatelessWidget {
                         ),
                     ],
                   ),
-                  // --- KẾT THÚC SỬA ---
                 ],
               ),
             ),
@@ -378,103 +374,148 @@ class CartScreen extends StatelessWidget {
       ),
     );
   }
-  // --- KẾT THÚC SỬA ---
 
+  // Widget nút tăng giảm số lượng
   Widget _buildQuantityButtons(
     BuildContext context,
     CartItem item,
     CartProvider cartProvider,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kOffWhiteColor,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                Icons.remove,
-                color: item.qty > 1
-                    ? kTextColor
-                    : kSecondaryTextColor.withOpacity(0.5),
-                size: 18,
-              ),
-              // SỬA: Gọi updateItemQuantity (backend sẽ tự xử lý xóa nếu qty <= 0)
-              onPressed:
-                  item.qty >
-                      0 // Vẫn kiểm tra > 0 để tránh gọi API vô nghĩa
-                  ? () async {
-                      try {
-                        await cartProvider.updateItemQuantity(
-                          item.id,
-                          item.qty - 1,
-                        );
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Lỗi: $e'),
-                              backgroundColor: kHeartColor,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  : null,
-              // --- KẾT THÚC SỬA ---
-            ),
+    bool isUpdating = false; // State tạm để disable nút khi đang gọi API
+
+    return StatefulBuilder(
+      // Dùng StatefulBuilder để quản lý isUpdating
+      builder: (context, setQtyState) {
+        return Container(
+          decoration: BoxDecoration(
+            color: kOffWhiteColor,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.grey.shade300, width: 1),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              item.qty.toString(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: kTextColor,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Nút giảm
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.remove,
+                    color: item.qty > 1 && !isUpdating
+                        ? kTextColor
+                        : kSecondaryTextColor.withOpacity(0.5),
+                    size: 18,
+                  ),
+                  // Disable nút khi đang loading hoặc qty <= 0
+                  onPressed: (isUpdating || item.qty <= 0)
+                      ? null
+                      : () async {
+                          setQtyState(
+                            () => isUpdating = true,
+                          ); // Bắt đầu loading
+                          try {
+                            // Gọi API cập nhật (Backend tự xử lý xóa nếu qty-1 <= 0)
+                            await cartProvider.updateItemQuantity(
+                              item.id,
+                              item.qty - 1,
+                            );
+                            // Fetch lại cart sẽ tự cập nhật UI
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Lỗi: $e'),
+                                  backgroundColor: kHeartColor,
+                                ),
+                              );
+                            }
+                          } finally {
+                            // Đảm bảo dừng loading
+                            if (context.mounted)
+                              setQtyState(() => isUpdating = false);
+                          }
+                        },
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.add, color: kTextColor, size: 18),
-              onPressed: () async {
-                try {
-                  await cartProvider.updateItemQuantity(item.id, item.qty + 1);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Lỗi: $e'),
-                        backgroundColor: kHeartColor,
+              // Số lượng
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: isUpdating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        item.qty.toString(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: kTextColor,
+                        ),
                       ),
-                    );
-                  }
-                }
-              },
-            ),
+              ),
+              // Nút tăng
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.add,
+                    color: !isUpdating
+                        ? kTextColor
+                        : kSecondaryTextColor.withOpacity(0.5),
+                    size: 18,
+                  ),
+                  onPressed: isUpdating
+                      ? null
+                      : () async {
+                          setQtyState(
+                            () => isUpdating = true,
+                          ); // Bắt đầu loading
+                          try {
+                            await cartProvider.updateItemQuantity(
+                              item.id,
+                              item.qty + 1,
+                            );
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Lỗi: $e'),
+                                  backgroundColor: kHeartColor,
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (context.mounted)
+                              setQtyState(() => isUpdating = false);
+                          }
+                        },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  // Widget thanh bottom bar tính tổng và nút checkout
   Widget _buildBottomBar(BuildContext context, CartProvider cartProvider) {
     final bool isEmpty =
         cartProvider.cart == null || cartProvider.cart!.items.isEmpty;
-    // SỬA: Lấy subtotal trực tiếp từ cart object (đã tính ở backend)
+    // Lấy subtotal đã tính từ backend
     final double subtotal = isEmpty ? 0.0 : cartProvider.cart!.subtotal;
-    // --- KẾT THÚC SỬA ---
+    // --- QUAN TRỌNG: Logic lấy/tạo Order ID ---
+    String? orderIdForPayment; // Sẽ lấy ID sau khi tạo Order thành công
+    // -----------------------------------------
+
+    // State tạm để quản lý loading cho nút checkout
+    bool _isCheckingOut = false;
 
     return Container(
       padding: const EdgeInsets.all(kDefaultPadding).copyWith(
@@ -505,7 +546,7 @@ class CartScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                currencyFormatter.format(subtotal), // Format tổng tiền
+                currencyFormatter.format(subtotal),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -515,35 +556,191 @@ class CartScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: kDefaultPadding),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: isEmpty
-                  ? null
-                  : () {
-                      /* TODO: Navigate to Checkout */
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryColor,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Tiến hành đặt hàng",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          // Sử dụng StatefulBuilder để quản lý trạng thái loading của nút
+          StatefulBuilder(
+            builder: (context, setCheckoutState) {
+              return SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed:
+                      (isEmpty ||
+                          _isCheckingOut) // Disable nếu rỗng hoặc đang checkout
+                      ? null
+                      : () async {
+                          // --- Logic gọi thanh toán Stripe ---
+                          setCheckoutState(
+                            () => _isCheckingOut = true,
+                          ); // Bắt đầu loading nút
+
+                          final stripeService = context.read<StripeService>();
+                          final cartProv = context
+                              .read<CartProvider>(); // Không listen
+                          final orderService = context
+                              .read<OrderService>(); // Lấy OrderService
+
+                          // 1. (QUAN TRỌNG) Tạo Order trên Backend trước khi thanh toán
+                          print("--- Start Payment Process ---");
+                          print("Step 1: Creating Order from Cart...");
+                          Order? newOrder;
+                          try {
+                            // Gọi API backend (POST /orders)
+                            newOrder = await orderService.createOrderFromCart();
+                            orderIdForPayment = newOrder!.id; // Lấy ID thật
+                            print(
+                              "Order created successfully: ID = $orderIdForPayment, Total = ${newOrder!.total}",
+                            );
+                          } catch (e) {
+                            print("Error creating order: $e");
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Lỗi tạo đơn hàng: ${e.toString()}",
+                                  ),
+                                  backgroundColor: kHeartColor,
+                                ),
+                              );
+                            }
+                            setCheckoutState(
+                              () => _isCheckingOut = false,
+                            ); // Dừng loading
+                            return; // Dừng nếu không tạo được order
+                          }
+                          // --- KẾT THÚC Tạo Order ---
+
+                          // 2. Kiểm tra lại orderIdForPayment
+                          if (orderIdForPayment == null || newOrder == null) {
+                            print(
+                              "Error: Order ID or Order object is null after creation.",
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Không thể tạo mã đơn hàng."),
+                                  backgroundColor: kHeartColor,
+                                ),
+                              );
+                            }
+                            setCheckoutState(() => _isCheckingOut = false);
+                            return;
+                          }
+
+                          // 3. Gọi Stripe Payment Sheet
+                          try {
+                            print(
+                              "Step 2: Presenting Stripe Payment Sheet for amount ${newOrder!.total}...",
+                            );
+                            await stripeService.presentPaymentSheet(
+                              context,
+                              amount:
+                                  newOrder!.total, // Lấy total từ Order mới tạo
+                              currency: 'vnd',
+                              orderId: orderIdForPayment, // Truyền ID đơn hàng
+                              merchantDisplayName: 'Khoi Ecom App',
+                            );
+
+                            // 4. Sheet đã đóng -> Kiểm tra trạng thái từ backend
+                            print(
+                              "Step 3: Payment sheet closed. Checking final order status from backend...",
+                            );
+                            // Sửa lỗi bằng cách tạo biến non-nullable cục bộ
+                            final String finalOrderId = orderIdForPayment!;
+                            String? finalStatus = await orderService
+                                .checkOrderStatus(
+                                  finalOrderId,
+                                ); // Dùng OrderService
+
+                            // 5. Xử lý kết quả cuối cùng
+                            if (finalStatus == 'paid') {
+                              print(
+                                "Step 4: Backend confirmed payment success for order $finalOrderId.",
+                              );
+                              // Giỏ hàng đã được xóa ở backend khi tạo order, chỉ cần fetch lại
+                              await cartProv.fetchCart(force: true);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Thanh toán thành công!"),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                Navigator.popUntil(
+                                  context,
+                                  (route) => route.isFirst,
+                                ); // Quay về Home
+                              }
+                            } else {
+                              print(
+                                "Step 4: Backend check FAILED or payment not completed (status: ${finalStatus ?? 'lỗi'}).",
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Thanh toán chưa hoàn tất (trạng thái: ${finalStatus ?? 'lỗi'}). Đơn hàng ${newOrder!.code} đã được tạo.",
+                                    ),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            // Lỗi xảy ra trong quá trình presentPaymentSheet hoặc checkOrderStatus
+                            print("Step 4: Payment process error: $e");
+                            // TODO: Gọi API backend để hủy Order vừa tạo (newOrder.id) nếu thanh toán thất bại?
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Lỗi thanh toán: ${e.toString()}",
+                                  ),
+                                  backgroundColor: kHeartColor,
+                                ),
+                              );
+                            }
+                          } finally {
+                            // Luôn dừng loading nút
+                            if (context.mounted)
+                              setCheckoutState(() => _isCheckingOut = false);
+                            print("--- End Payment Process ---");
+                          }
+                          // --- Kết thúc logic Stripe ---
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 20),
-                ],
-              ),
-            ),
+                  child: _isCheckingOut
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Tiến hành đặt hàng",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(Icons.lock_outline, size: 20),
+                          ],
+                        ),
+                ),
+              );
+            },
           ),
         ],
       ),
