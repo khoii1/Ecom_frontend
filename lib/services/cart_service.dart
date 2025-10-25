@@ -1,70 +1,101 @@
 import 'package:dio/dio.dart';
 import 'package:ecom_frontend/models/cart.dart';
-import 'package:ecom_frontend/models/cart_item.dart';
+// Bỏ import CartItem vì hàm add/update không cần trả về nữa
+// import 'package:ecom_frontend/models/cart_item.dart';
 
 class CartService {
   final Dio _dio;
   CartService(this._dio);
 
-  // GET /cart
+  // GET /cart - Lấy giỏ hàng của user hiện tại
   Future<Cart> getMyCart() async {
     try {
       final response = await _dio.get('/cart');
+      // Backend đã trả về đúng cấu trúc Cart rồi
       return Cart.fromJson(response.data);
-    } on DioException catch (e) {
+    // SỬA: Bỏ Future<dynamic> khỏi mệnh đề on
+    } on DioException catch (e) { // <<< SỬA Ở ĐÂY
+    // --- KẾT THÚC SỬA ---
+      if (e.response?.statusCode == 404) {
+        // Trả về Cart rỗng với subtotal = 0
+        return Cart(cartId: '', items: [], subtotal: 0.0);
+      }
+      print("DioException getMyCart: ${e.response?.data}");
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi lấy giỏ hàng');
+    } catch (e) {
+      print("Exception getMyCart: $e");
+      throw Exception('Lỗi không xác định khi lấy giỏ hàng');
     }
   }
 
-  // POST /cart/items
-  Future<CartItem> addItem(String productId, int qty) async {
+  // POST /cart/items - Thêm sản phẩm vào giỏ
+  Future<void> addItemToCart(String productId, int quantity) async {
     try {
-      final response = await _dio.post(
+      await _dio.post(
         '/cart/items',
         data: {
           'product_id': productId,
-          'qty': qty,
+          'qty': quantity,
         },
       );
-      // API backend của bạn trả về cart_item đã tạo/cập nhật
-      // Chúng ta cần giả lập lại đối tượng CartItem đầy đủ vì API /cart/items
-      // không trả về tên và giá sản phẩm.
-      // Tạm thời trả về dữ liệu thô, CartProvider sẽ fetch lại giỏ hàng.
-      // return CartItem.fromJson(response.data); 
-      // -> Đây là cách tốt hơn:
-      return response.data; // Trả về dữ liệu thô, provider sẽ fetch lại
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi khi thêm sản phẩm');
+    // SỬA: Bỏ Future<dynamic> khỏi mệnh đề on
+    } on DioException catch (e) { // <<< SỬA Ở ĐÂY
+    // --- KẾT THÚC SỬA ---
+      print("DioException addItemToCart: ${e.response?.data}");
+      throw Exception(
+          e.response?.data['message'] ?? 'Lỗi khi thêm vào giỏ hàng');
+    } catch (e) {
+      print("Exception addItemToCart: $e");
+      throw Exception('Lỗi không xác định khi thêm vào giỏ hàng');
     }
   }
 
-  // PUT /cart/items/:itemId
-  Future<void> updateItem(String cartItemId, int qty) async {
+  // PUT /cart/items/:itemId - Cập nhật số lượng item
+  Future<void> updateCartItem(String itemId, int quantity) async {
     try {
       await _dio.put(
-        '/cart/items/$cartItemId',
-        data: {'qty': qty},
+        '/cart/items/$itemId',
+        data: {'qty': quantity},
       );
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi khi cập nhật số lượng');
+    // SỬA: Bỏ Future<dynamic> khỏi mệnh đề on
+    } on DioException catch (e) { // <<< SỬA Ở ĐÂY
+    // --- KẾT THÚC SỬA ---
+       print("DioException updateCartItem: ${e.response?.data}");
+      throw Exception(
+          e.response?.data['message'] ?? 'Lỗi khi cập nhật giỏ hàng');
+    } catch (e) {
+       print("Exception updateCartItem: $e");
+      throw Exception('Lỗi không xác định khi cập nhật giỏ hàng');
     }
   }
 
-  // DELETE /cart/items/:itemId
-  Future<void> removeItem(String cartItemId) async {
+  // DELETE /cart/items/:itemId - Xóa item khỏi giỏ
+  Future<void> removeCartItem(String itemId) async {
     try {
-      await _dio.delete('/cart/items/$cartItemId');
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi khi xóa sản phẩm');
+      await _dio.delete('/cart/items/$itemId');
+    // SỬA: Bỏ Future<dynamic> khỏi mệnh đề on
+    } on DioException catch (e) { // <<< SỬA Ở ĐÂY
+    // --- KẾT THÚC SỬA ---
+       print("DioException removeCartItem: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Lỗi khi xóa khỏi giỏ hàng');
+    } catch (e) {
+       print("Exception removeCartItem: $e");
+       throw Exception('Lỗi không xác định khi xóa khỏi giỏ hàng');
     }
   }
 
-  // DELETE /cart
+  // DELETE /cart - Xóa toàn bộ giỏ hàng
   Future<void> clearCart() async {
     try {
       await _dio.delete('/cart');
-    } on DioException catch (e) {
+    // SỬA: Bỏ Future<dynamic> khỏi mệnh đề on
+    } on DioException catch (e) { // <<< SỬA Ở ĐÂY
+    // --- KẾT THÚC SỬA ---
+       print("DioException clearCart: ${e.response?.data}");
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi xóa giỏ hàng');
+    } catch (e) {
+       print("Exception clearCart: $e");
+       throw Exception('Lỗi không xác định khi xóa giỏ hàng');
     }
   }
 }

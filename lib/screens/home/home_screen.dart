@@ -269,7 +269,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
 
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
-    symbol: '₫',
+    symbol: 'đ',
     decimalDigits: 0, // Bỏ phần thập phân
   );
 
@@ -395,7 +395,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                  // SỬA: Xóa const
+                  MaterialPageRoute(builder: (_) => CartScreen()),
+                  // --- KẾT THÚC SỬA ---
                 );
               },
             ),
@@ -899,8 +901,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 padding: const EdgeInsets.all(kDefaultPadding * 0.75),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  // SỬA: Bỏ mainAxisAlignment.spaceBetween để các widget gần nhau hơn
-                  // mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Tên sản phẩm
                     Text(
@@ -913,9 +913,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                       maxLines: 2, // Cho phép 2 dòng
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // SỬA: Giảm khoảng cách SizedBox
-                    const SizedBox(height: 4), // <<< Giảm chiều cao ở đây
-                    // --- KẾT THÚC SỬA ---
+                    const SizedBox(height: 4), // Giảm khoảng cách
                     // Hàng Giá và Rating
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -983,6 +981,8 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           ),
                       ],
                     ),
+                    // Spacer để đẩy giá + rating xuống nếu dùng spaceBetween cho Column cha
+                    // const Spacer(), // Bỏ Spacer này nếu không dùng spaceBetween cho Column cha
                   ],
                 ),
               ),

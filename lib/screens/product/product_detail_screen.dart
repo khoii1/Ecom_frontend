@@ -6,11 +6,13 @@ import 'package:intl/intl.dart'; // Thêm thư viện intl để format tiền t
 import 'package:ecom_frontend/models/product.dart'; // Model Product của bạn
 import 'package:ecom_frontend/services/product_service.dart'; // Service Product của bạn
 import 'package:ecom_frontend/widgets/primary_button.dart'; // Widget Button của bạn
-import 'package:ecom_frontend/providers/cart_provider.dart'; // Provider giỏ hàng (nếu có)
+import 'package:ecom_frontend/providers/cart_provider.dart'; // Provider giỏ hàng
 import 'package:ecom_frontend/providers/product_provider.dart'; // Provider sản phẩm
+// SỬA: Thêm import cho CartScreen
+import 'package:ecom_frontend/screens/cart/cart_screen.dart'; // <<< THÊM DÒNG NÀY
+// --- KẾT THÚC SỬA ---
 import 'package:ecom_frontend/utils/constants.dart';
-
-//--------------------------------------------
+import 'package:flutter/scheduler.dart'; // Import SchedulerBinding
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId; // ID sản phẩm được truyền vào
@@ -27,27 +29,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? _errorMessage;
   int _currentImageIndex = 0; // Để theo dõi ảnh đang hiển thị
 
-  // --- THÊM MỚI: State cho sản phẩm tương tự ---
   List<Product> _similarProducts = [];
   bool _isLoadingSimilar = true;
-  // --- KẾT THÚC THÊM MỚI ---
 
-  // Format tiền tệ
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
     symbol: '₫',
-    decimalDigits: 0, // SỬA: Bỏ phần thập phân
+    decimalDigits: 0, // Bỏ phần thập phân
   );
+
+  // --- THÊM MỚI: Biến kiểm tra mounted ---
+  // bool _mounted = true; // Không cần thiết trong StatefulWidget
 
   @override
   void initState() {
     super.initState();
+    // _mounted = true; // Không cần thiết
     _fetchProductDetails();
   }
 
+  // @override
+  // void dispose() {
+  //   _mounted = false; // Không cần thiết
+  //   super.dispose();
+  // }
+
   Future<void> _fetchProductDetails() async {
-    // Đảm bảo reset trạng thái loading khi retry
-    if (!mounted) return;
+    if (!mounted) return; // Kiểm tra mounted có sẵn trong State
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -58,17 +66,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final productData = await productService.getProductDetail(
         widget.productId,
       );
+      // Kiểm tra mounted lần nữa trước khi gọi setState
       if (mounted) {
         setState(() {
           _product = productData;
           _isLoading = false;
-          _errorMessage = null; // Xóa lỗi cũ nếu thành công
+          _errorMessage = null;
         });
-        _fetchSimilarProducts(); // <-- Gọi hàm lấy sản phẩm tương tự ở đây
+        _fetchSimilarProducts();
       }
     } catch (e) {
       print("Lỗi lấy chi tiết sản phẩm: $e");
       if (mounted) {
+        // Kiểm tra mounted
         setState(() {
           _errorMessage = 'Không thể tải chi tiết sản phẩm: ${e.toString()}';
           _isLoading = false;
@@ -78,36 +88,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _fetchSimilarProducts() {
+    // Kiểm tra mounted ở đầu hàm
+    if (!mounted) return;
+
     if (_product == null || _product!.categoryId == null) {
-      if (mounted) setState(() => _isLoadingSimilar = false);
-      return; // Không có category thì không tìm tương tự
-    }
-
-    // Đặt lại trạng thái loading
-    if (mounted) setState(() => _isLoadingSimilar = true);
-
-    // Lấy ProductProvider để truy cập danh sách sản phẩm đã tải
-    ProductProvider? productProvider = context.read<ProductProvider>();
-    if (productProvider == null || productProvider.products.isEmpty) {
-      print("ProductProvider chưa sẵn sàng hoặc chưa có sản phẩm.");
-      if (mounted) setState(() => _isLoadingSimilar = false);
+      setState(() => _isLoadingSimilar = false);
       return;
     }
 
-    // Lọc danh sách sản phẩm đã có trong provider
+    setState(() => _isLoadingSimilar = true);
+
+    ProductProvider? productProvider = context.read<ProductProvider>();
+    if (productProvider == null || productProvider.products.isEmpty) {
+      print("ProductProvider chưa sẵn sàng hoặc chưa có sản phẩm.");
+      if (mounted)
+        setState(() => _isLoadingSimilar = false); // Kiểm tra mounted
+      return;
+    }
+
     try {
       final similar = productProvider.products
           .where(
-            (p) =>
-                p.categoryId == _product!.categoryId && // Cùng category
-                p.id != _product!.id, // Khác sản phẩm hiện tại
+            (p) => p.categoryId == _product!.categoryId && p.id != _product!.id,
           )
           .toList();
 
-      // Giới hạn số lượng hiển thị
       final limitedSimilar = similar.take(4).toList();
 
       if (mounted) {
+        // Kiểm tra mounted
         setState(() {
           _similarProducts = limitedSimilar;
           _isLoadingSimilar = false;
@@ -116,6 +125,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     } catch (e) {
       print("Lỗi khi lọc sản phẩm tương tự: $e");
       if (mounted) {
+        // Kiểm tra mounted
         setState(() {
           _isLoadingSimilar = false;
         });
@@ -124,30 +134,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() {
+    // Kiểm tra mounted trước khi truy cập context
+    if (!mounted) return;
     if (_product != null) {
       final cartProvider = context.read<CartProvider>();
       try {
+        // Không cần await nếu chỉ hiển thị SnackBar ngay lập tức
         cartProvider.addToCart(_product!.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã thêm "${_product!.title}" vào giỏ hàng'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: kPrimaryColor, // Sử dụng màu chính
-          ),
-        );
+        // Kiểm tra mounted trước khi hiển thị SnackBar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã thêm "${_product!.title}" vào giỏ hàng'),
+              duration: const Duration(seconds: 2),
+              backgroundColor: kPrimaryColor,
+            ),
+          );
+        }
         print('Thêm vào giỏ hàng: ${_product!.id}');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi thêm vào giỏ: ${e.toString()}'),
-            backgroundColor: kHeartColor, // Màu đỏ lỗi
-          ),
-        );
+        if (mounted) {
+          // Kiểm tra mounted
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi thêm vào giỏ: ${e.toString()}'),
+              backgroundColor: kHeartColor,
+            ),
+          );
+        }
       }
     }
   }
 
   void _buyNow() {
+    // Kiểm tra mounted trước khi truy cập context
+    if (!mounted) return;
     if (_product != null) {
       ScaffoldMessenger.of(
         context,
@@ -175,15 +196,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.white),
             onPressed: () {
-              /* TODO: Favorite */
+              // TODO: Xử lý thêm vào yêu thích
             },
           ),
+          // SỬA: Thêm hành động điều hướng cho IconButton giỏ hàng
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
             onPressed: () {
-              Navigator.pushNamed(context, '/cart');
+              // Điều hướng đến CartScreen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CartScreen(),
+                ), // Bỏ const nếu CartScreen không const
+              );
             },
           ),
+          // --- KẾT THÚC SỬA ---
         ],
       ),
       body: _buildBody(),
@@ -281,7 +310,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           PageView.builder(
             itemCount: images.length,
             onPageChanged: (index) {
-              setState(() => _currentImageIndex = index);
+              // Kiểm tra mounted trước khi gọi setState
+              if (mounted) setState(() => _currentImageIndex = index);
             },
             itemBuilder: (context, index) {
               return Image.network(
@@ -339,7 +369,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // --- SỬA: Điều chỉnh lại giao diện phần giá ---
   Widget _buildProductInfo() {
     bool hasDiscount =
         _product!.discountPercentage != null &&
@@ -348,117 +377,108 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- Tên Sản Phẩm ---
-        Text(
-          _product!.title,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: kTextColor,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: kDefaultPadding * 0.75), // Tăng khoảng cách chút
-        // --- Hàng Giá và Discount Badge ---
         Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.baseline, // Căn baseline để giá đẹp hơn
-          textBaseline: TextBaseline.alphabetic, // Cần có khi dùng baseline
+          crossAxisAlignment: CrossAxisAlignment.start, // Căn trên cùng
           children: [
-            // Giá cuối cùng (sau giảm giá nếu có)
-            Text(
-              currencyFormatter.format(_product!.finalPrice ?? _product!.price),
-              style: const TextStyle(
-                fontSize: 26, // To hơn chút
-                fontWeight: FontWeight.bold,
-                color: kBrownDark,
+            // Cột Tên + Rating + Sold
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _product!.title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: kTextColor,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: kDefaultPadding / 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: kStarColor, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        _product!.rating?.toStringAsFixed(1) ?? 'N/A',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: kTextColor,
+                        ),
+                      ),
+                      const SizedBox(width: kDefaultPadding / 2),
+                      const Text(
+                        '|',
+                        style: TextStyle(color: kSecondaryTextColor),
+                      ),
+                      const SizedBox(width: kDefaultPadding / 2),
+                      const Text(
+                        '8,374 sold',
+                        style: TextStyle(color: kSecondaryTextColor),
+                      ), // Dữ liệu giả định
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: kDefaultPadding * 0.75), // Tăng khoảng cách
-            // Giá gốc (nếu có giảm giá)
-            if (hasDiscount)
-              Padding(
-                padding: const EdgeInsets.only(
-                  bottom: 2,
-                ), // Nâng giá gốc lên 1 chút
-                child: Text(
-                  currencyFormatter.format(_product!.price),
-                  style: const TextStyle(
-                    fontSize: 16, // To hơn giá gốc cũ
-                    color: kSecondaryTextColor,
-                    decoration: TextDecoration.lineThrough,
-                    decorationColor: kHeartColor, // Màu gạch đỏ
-                    decorationThickness: 1.5,
+            const SizedBox(width: kDefaultPadding),
+            // Cột Giá + Discount Badge
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end, // Căn phải
+              children: [
+                Text(
+                  currencyFormatter.format(
+                    _product!.finalPrice ?? _product!.price,
                   ),
-                ),
-              ),
-            const SizedBox(width: kDefaultPadding * 0.75), // Tăng khoảng cách
-            // Discount Badge (nếu có giảm giá)
-            if (hasDiscount)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ), // Tăng padding
-                decoration: BoxDecoration(
-                  color: kHeartColor.withOpacity(0.15), // Nền màu đỏ nhạt hơn
-                  borderRadius: BorderRadius.circular(15), // Bo tròn nhiều hơn
-                  border: Border.all(
-                    color: kHeartColor,
-                    width: 1,
-                  ), // Thêm viền đỏ
-                ),
-                child: Text(
-                  '-${_product!.discountPercentage!.toInt()}%',
                   style: const TextStyle(
-                    color: kHeartColor, // Chữ màu đỏ
-                    fontSize: 13, // To hơn chút
+                    fontSize: 24, // To hơn chút
                     fontWeight: FontWeight.bold,
+                    color: kBrownDark,
                   ),
                 ),
-              ),
+                if (hasDiscount) ...[
+                  // Dùng spread operator để thêm nhiều widget
+                  const SizedBox(height: 2), // Khoảng cách nhỏ
+                  Text(
+                    currencyFormatter.format(_product!.price),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: kSecondaryTextColor,
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: kHeartColor,
+                      decorationThickness: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: kHeartColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: kHeartColor.withOpacity(0.5),
+                        width: 1,
+                      ), // Viền nhạt hơn
+                    ),
+                    child: Text(
+                      '-${_product!.discountPercentage!.toInt()}%',
+                      style: const TextStyle(
+                        color: kHeartColor,
+                        fontSize: 12, // Nhỏ hơn
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
 
-        // --- Kết thúc hàng Giá ---
-        const SizedBox(height: kDefaultPadding / 2), // Giữ nguyên khoảng cách
-        // --- Hàng Rating và Số lượng bán ---
-        Row(
-          children: [
-            const Icon(Icons.star, color: kStarColor, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              _product!.rating?.toStringAsFixed(1) ?? 'N/A',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: kTextColor,
-              ),
-            ),
-            const SizedBox(width: kDefaultPadding / 2),
-            const Text('|', style: TextStyle(color: kSecondaryTextColor)),
-            const SizedBox(width: kDefaultPadding / 2),
-            const Text(
-              '8,374 sold',
-              style: TextStyle(color: kSecondaryTextColor),
-            ), // Dữ liệu giả định
-            const Spacer(),
-            IconButton(
-              icon: const Icon(
-                Icons.share_outlined,
-                size: 20,
-                color: kSecondaryTextColor,
-              ),
-              onPressed: () {
-                /* TODO: Share */
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-
-        // --- Kết thúc hàng Rating ---
         const SizedBox(height: kDefaultPadding),
 
         // --- Mô tả sản phẩm ---
@@ -482,7 +502,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
     );
   }
-  // --- KẾT THÚC SỬA ---
 
   Widget _buildSimilarProductsSection() {
     return Column(
@@ -550,8 +569,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(productId: product.id),
-          ),
+            builder: (context) => ProductDetailScreen(productId: product.id),
+          ), // Thêm context
         );
       },
       child: Container(
@@ -706,14 +725,4 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
-}
-
-double? _parseDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is String) {
-    return double.tryParse(value);
-  } else if (value is num) {
-    return value.toDouble();
-  }
-  return null;
 }
