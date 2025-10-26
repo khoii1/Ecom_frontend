@@ -46,7 +46,7 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // Hàm hiển thị dialog xác nhận xóa tất cả
+  // Hộp thoại xác nhận xóa tất cả
   Future<void> _confirmClearCart(
     BuildContext context,
     CartProvider cartProvider,
@@ -119,7 +119,7 @@ class CartScreen extends StatelessWidget {
               const Icon(Icons.error_outline, color: kHeartColor, size: 60),
               const SizedBox(height: kDefaultPadding),
               Text(
-                "Lỗi tải giỏ hàng:\n${cartProvider.errorMessage ?? 'Unknown error'}",
+                "Lỗi tải giỏ hàng:\n${cartProvider.errorMessage ?? 'Lỗi không xác định'}",
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: kHeartColor),
               ),
@@ -211,7 +211,7 @@ class CartScreen extends StatelessWidget {
               const SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
-                  /* TODO: Apply promo code */
+                  /* TODO: Áp dụng mã khuyến mãi */
                 },
                 child: const Text("Áp dụng"),
               ),
@@ -527,24 +527,24 @@ class CartScreen extends StatelessWidget {
 
                           try {
                             // 1. Tạo Order trên Backend trước khi thanh toán
-                            print("--- Start Payment Process ---");
-                            print("Step 1: Creating Order from Cart...");
+                            print("--- Bắt đầu quy trình thanh toán ---");
+                            print("Bước 1: Tạo đơn hàng từ giỏ hàng...");
                             final orderService = context.read<OrderService>();
                             newOrder = await orderService.createOrderFromCart();
                             orderIdForPayment = newOrder.id;
                             print(
-                              "Order created successfully: ID = $orderIdForPayment, Total = ${newOrder.total}",
+                              "Tạo đơn hàng thành công: ID = $orderIdForPayment, Tổng = ${newOrder.total}",
                             );
 
                             if (orderIdForPayment == null || newOrder == null) {
                               throw Exception("Không thể tạo mã đơn hàng.");
                             }
 
-                            // --- Logic gọi VNPay ---
+                            // --- Gọi VNPay ---
                             final vnpayService = context.read<VnpayService>();
                             // 2. Lấy URL thanh toán từ backend
                             print(
-                              "Step 2: Getting VNPay URL for Order ID $orderIdForPayment, Amount ${newOrder.total}",
+                              "Bước 2: Lấy URL thanh toán VNPay cho Order $orderIdForPayment, Số tiền ${newOrder.total}",
                             );
                             final paymentUrl = await vnpayService
                                 .createPaymentUrl(
@@ -553,25 +553,20 @@ class CartScreen extends StatelessWidget {
                                 );
 
                             if (paymentUrl != null) {
-                              // 3. --- THAY THẾ PHẦN NÀY ---
-                              print("Step 3: Navigating to VNPay WebView...");
-                              // Đảm bảo context vẫn còn tồn tại trước khi điều hướng
+                              // 3. Điều hướng sang WebView
+                              print(
+                                "Bước 3: Điều hướng tới màn hình WebView VNPay...",
+                              );
                               if (context.mounted) {
-                                // Điều hướng đến màn hình WebView bằng route name đã đăng ký
                                 Navigator.of(context).pushNamed(
-                                  VnpayWebViewScreen
-                                      .routeName, // Sử dụng route name
+                                  VnpayWebViewScreen.routeName,
                                   arguments: {
-                                    // Truyền URL qua arguments
                                     'paymentUrl': paymentUrl,
-                                    // Bạn có thể truyền thêm orderId nếu màn hình WebView cần
                                     // 'orderId': orderIdForPayment,
                                   },
                                 );
                               }
-                              // --- KẾT THÚC THAY THẾ ---
                             } else {
-                              // Ném lỗi nếu không lấy được URL từ backend
                               throw Exception(
                                 "Không lấy được URL thanh toán VNPay.",
                               );
@@ -579,7 +574,7 @@ class CartScreen extends StatelessWidget {
                             // --- Kết thúc logic VNPay ---
                           } catch (e) {
                             // Xử lý lỗi (chung cho cả tạo order và VNPay)
-                            print("Payment process error: $e");
+                            print("Lỗi quy trình thanh toán: $e");
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -595,7 +590,7 @@ class CartScreen extends StatelessWidget {
                             if (context.mounted) {
                               setCheckoutState(() => _isCheckingOut = false);
                             }
-                            print("--- End Payment Process ---");
+                            print("--- Kết thúc quy trình thanh toán ---");
                           }
                           // --- Kết thúc logic thanh toán ---
                         },

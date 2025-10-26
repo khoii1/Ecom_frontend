@@ -6,6 +6,7 @@ class ProductService {
   final Dio _dio;
   ProductService(this._dio);
 
+  // Lấy danh sách sản phẩm
   Future<List<Product>> getProducts() async {
     try {
       final response = await _dio.get('/products');
@@ -16,8 +17,7 @@ class ProductService {
     }
   }
 
-  // --- SỬA: BẮT ĐẦU THÊM MỚI ---
-  // GET /products/:productId - Lấy chi tiết sản phẩm theo ID
+  // Lấy chi tiết 1 sản phẩm theo ID
   Future<Product> getProductDetail(String productId) async {
     try {
       final response = await _dio.get('/products/$productId');
@@ -30,18 +30,16 @@ class ProductService {
         e.response?.data['message'] ?? 'Lỗi lấy chi tiết sản phẩm',
       );
     } catch (e) {
-      // Bắt các lỗi khác (ví dụ: lỗi parsing JSON nếu backend trả về sai định dạng)
       print("Lỗi không xác định khi lấy chi tiết sản phẩm: $e");
       throw Exception('Lỗi không xác định khi lấy chi tiết sản phẩm');
     }
   }
-  // --- SỬA: KẾT THÚC THÊM MỚI ---
 
-  // POST /products/upload-image
+  // Upload ảnh sản phẩm -> trả về URL ảnh
   Future<String?> uploadImage(File imageFile) async {
     try {
-      String fileName = imageFile.path.split('/').last;
-      FormData formData = FormData.fromMap({
+      final fileName = imageFile.path.split('/').last;
+      final formData = FormData.fromMap({
         "image": await MultipartFile.fromFile(
           imageFile.path,
           filename: fileName,
@@ -51,18 +49,17 @@ class ProductService {
         '/products/upload-image',
         data: formData,
       );
-      // Kiểm tra kỹ key trả về từ backend (có thể là 'image_url' hoặc 'imageUrl')
+      // Tùy backend: có thể trả về 'image_url' hoặc 'imageUrl'
       return response.data['image_url'];
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi upload ảnh');
     } catch (e) {
-      // Bắt các lỗi khác
       print("Lỗi không xác định khi upload ảnh: $e");
       throw Exception('Lỗi không xác định khi upload ảnh');
     }
   }
 
-  // POST /products
+  // Tạo sản phẩm mới
   Future<Product> addProduct({
     required String storeId,
     required String title,
@@ -84,17 +81,15 @@ class ProductService {
         if (categoryId != null && categoryId.isNotEmpty)
           'category_id': categoryId,
         if (imageUrl != null) 'image_url': imageUrl,
-        'status': 'active', // Đảm bảo status được gửi đi
+        'status': 'active',
       };
 
       final response = await _dio.post('/products', data: productData);
       return Product.fromJson(response.data);
     } on DioException catch (e) {
-      // In ra lỗi chi tiết hơn từ Dio
       print("DioException khi tạo sản phẩm: ${e.response?.data}");
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi tạo sản phẩm');
     } catch (e) {
-      // Bắt các lỗi khác (ví dụ: lỗi parsing JSON)
       print("Lỗi không xác định khi tạo sản phẩm: $e");
       throw Exception('Lỗi không xác định khi tạo sản phẩm');
     }

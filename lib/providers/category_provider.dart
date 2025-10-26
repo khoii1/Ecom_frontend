@@ -2,7 +2,7 @@ import 'package:ecom_frontend/models/category.dart';
 import 'package:ecom_frontend/services/category_service.dart';
 import 'package:flutter/material.dart';
 
-// Enum for loading states
+/// Trạng thái tải danh mục
 enum CategoryStatus { initial, loading, loaded, error }
 
 class CategoryProvider extends ChangeNotifier {
@@ -18,14 +18,15 @@ class CategoryProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   CategoryProvider(this._categoryService) {
-    // Fetch categories on initialization
+    // Tự động tải danh mục khi khởi tạo Provider
     fetchCategories();
   }
 
+  /// Lấy danh sách danh mục từ API
   Future<void> fetchCategories() async {
     _status = CategoryStatus.loading;
-    _errorMessage = null; // Reset previous error
-    notifyListeners(); // Notify UI about loading state
+    _errorMessage = null;
+    notifyListeners();
 
     try {
       _categories = await _categoryService.getCategories();
@@ -34,11 +35,11 @@ class CategoryProvider extends ChangeNotifier {
       _errorMessage = e.toString();
       _status = CategoryStatus.error;
     } finally {
-      notifyListeners(); // Notify UI about loaded state or error
+      notifyListeners();
     }
   }
 
-  // Optional: Add refresh method if needed later
+  /// Làm mới lại danh sách danh mục
   Future<void> refreshCategories() async {
     await fetchCategories();
   }

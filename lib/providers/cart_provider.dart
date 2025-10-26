@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-// SỬA: Thêm import scheduler
-import 'package:flutter/scheduler.dart';
+import 'package:flutter/scheduler.dart'; // Dùng cho addPostFrameCallback
 import 'package:ecom_frontend/models/cart.dart';
-import 'package:ecom_frontend/models/cart_item.dart'; // Import CartItem
+import 'package:ecom_frontend/models/cart_item.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/services/cart_service.dart';
 
-// Enum để quản lý trạng thái tải dữ liệu rõ ràng hơn
+/// Trạng thái tải dữ liệu giỏ hàng
 enum CartStatus { initial, loading, loaded, error }
 
 class CartProvider extends ChangeNotifier {
   final CartService _cartService;
-  final AuthProvider? _authProvider; // Vẫn giữ để lắng nghe thay đổi auth
+  final AuthProvider? _authProvider; // Nghe thay đổi đăng nhập
 
   Cart? _cart;
   Cart? get cart => _cart;
@@ -22,87 +21,78 @@ class CartProvider extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  // Constructor nhận CartService và AuthProvider (tùy chọn)
   CartProvider(this._cartService, this._authProvider) {
-    // Lắng nghe sự thay đổi trạng thái đăng nhập từ AuthProvider
+    // Lắng nghe trạng thái đăng nhập và tải giỏ hàng khi cần
     _authProvider?.addListener(_onAuthChanged);
-    // Fetch giỏ hàng ngay nếu đã đăng nhập
     _onAuthChanged();
   }
 
-  // Hàm được gọi khi trạng thái đăng nhập thay đổi
+  /// Khi trạng thái đăng nhập thay đổi
   void _onAuthChanged() {
     if (_authProvider?.authStatus == AuthStatus.authenticated) {
-      // Chỉ fetch nếu đang ở trạng thái initial hoặc sau khi đăng xuất/đăng nhập lại
+      // Chỉ fetch khi mới khởi tạo hoặc chưa có giỏ
       if (_status == CartStatus.initial || _cart == null) {
-        print("User authenticated, fetching cart...");
+        debugPrint("Đã đăng nhập → tải giỏ hàng…");
         fetchCart();
       }
     } else {
-      // Nếu đăng xuất, xóa giỏ hàng local
-      print("User logged out, clearing local cart.");
+      // Đăng xuất → dọn giỏ local
+      debugPrint("Đã đăng xuất → xóa giỏ hàng local.");
       _cart = null;
       _status = CartStatus.initial;
       _errorMessage = null;
-      notifyListeners(); // Thông báo UI để xóa giỏ hàng
+      notifyListeners();
     }
   }
 
-  // Hàm fetch giỏ hàng chính
+  /// Tải giỏ hàng hiện tại của người dùng
   Future<void> fetchCart({bool force = false}) async {
-    // Chỉ fetch nếu chưa load, hoặc bắt buộc (force=true), hoặc đang lỗi
+    // Tránh gọi thừa nếu đang loading/đã loaded, trừ khi force
     if (!force &&
         (_status == CartStatus.loading || _status == CartStatus.loaded)) {
-      print("Skipping fetchCart (status: $_status, force: $force)");
+      debugPrint("Bỏ qua fetchCart (status: $_status, force: $force)");
       return;
     }
 
     _status = CartStatus.loading;
     _errorMessage = null;
-
     notifyListeners();
 
     try {
-      // Kiểm tra lại đăng nhập trước khi gọi API
       if (_authProvider?.authStatus != AuthStatus.authenticated) {
         throw Exception("Người dùng chưa đăng nhập.");
       }
       _cart = await _cartService.getMyCart();
       _status = CartStatus.loaded;
-      print("Cart fetched successfully: ${_cart?.items.length ?? 0} items");
+      debugPrint(
+        "Tải giỏ hàng thành công: ${_cart?.items.length ?? 0} sản phẩm.",
+      );
     } catch (e) {
-      print("Error fetching cart: $e");
+      debugPrint("Lỗi tải giỏ hàng: $e");
       _errorMessage = e.toString();
       _status = CartStatus.error;
-      _cart = null; // Xóa cart cũ nếu có lỗi
+      _cart = null;
     } finally {
-      // Luôn dùng addPostFrameCallback để gọi notifyListeners an toàn
-      // Đảm bảo gọi sau khi frame đã build xong, tránh lỗi
       if (mounted) {
-        // Kiểm tra mounted trước khi gọi addPostFrameCallback
         SchedulerBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            // Kiểm tra mounted lần nữa bên trong callback
-            notifyListeners();
-          }
+          if (mounted) notifyListeners();
         });
       }
     }
   }
 
-  // Thêm sản phẩm vào giỏ
+  /// Thêm sản phẩm vào giỏ
   Future<void> addToCart(String productId, {int qty = 1}) async {
-    print("Attempting to add product $productId to cart...");
+    debugPrint("Thêm sản phẩm $productId vào giỏ (số lượng: $qty) …");
     try {
-      // Kiểm tra đăng nhập
       if (_authProvider?.authStatus != AuthStatus.authenticated) {
         throw Exception("Vui lòng đăng nhập để thêm vào giỏ hàng.");
       }
       await _cartService.addItemToCart(productId, qty);
-      print("Add to cart successful, refreshing cart...");
-      await fetchCart(force: true); // Bắt buộc fetch lại
+      debugPrint("Thêm thành công, làm mới giỏ hàng…");
+      await fetchCart(force: true);
     } catch (e) {
-      print("Error adding to cart: $e");
+      debugPrint("Lỗi thêm vào giỏ: $e");
       _errorMessage = e.toString();
       _status = CartStatus.error;
       if (mounted) {
@@ -114,24 +104,23 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  // Cập nhật số lượng
+  /// Cập nhật số lượng một item
   Future<void> updateItemQuantity(String cartItemId, int qty) async {
-    print("Attempting to update item $cartItemId quantity to $qty...");
+    debugPrint("Cập nhật số lượng item $cartItemId → $qty …");
     try {
-      // Kiểm tra đăng nhập
       if (_authProvider?.authStatus != AuthStatus.authenticated) {
         throw Exception("Vui lòng đăng nhập để cập nhật giỏ hàng.");
       }
       if (qty <= 0) {
-        print("Quantity is <= 0, removing item instead.");
+        debugPrint("Số lượng ≤ 0 → xóa item thay vì cập nhật.");
         await removeFromCart(cartItemId);
         return;
       }
       await _cartService.updateCartItem(cartItemId, qty);
-      print("Update quantity successful, refreshing cart...");
+      debugPrint("Cập nhật thành công, làm mới giỏ hàng…");
       await fetchCart(force: true);
     } catch (e) {
-      print("Error updating item quantity: $e");
+      debugPrint("Lỗi cập nhật số lượng: $e");
       _errorMessage = e.toString();
       _status = CartStatus.error;
       if (mounted) {
@@ -143,19 +132,18 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  // Xóa item khỏi giỏ
+  /// Xóa một item khỏi giỏ
   Future<void> removeFromCart(String cartItemId) async {
-    print("Attempting to remove item $cartItemId from cart...");
+    debugPrint("Xóa item $cartItemId khỏi giỏ…");
     try {
-      // Kiểm tra đăng nhập
       if (_authProvider?.authStatus != AuthStatus.authenticated) {
         throw Exception("Vui lòng đăng nhập để xóa sản phẩm khỏi giỏ hàng.");
       }
       await _cartService.removeCartItem(cartItemId);
-      print("Remove item successful, refreshing cart...");
+      debugPrint("Xóa thành công, làm mới giỏ hàng…");
       await fetchCart(force: true);
     } catch (e) {
-      print("Error removing item from cart: $e");
+      debugPrint("Lỗi xóa khỏi giỏ: $e");
       _errorMessage = e.toString();
       _status = CartStatus.error;
       if (mounted) {
@@ -167,32 +155,32 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  // Xóa toàn bộ giỏ hàng
+  /// Xóa toàn bộ giỏ hàng
   Future<void> clearCart() async {
-    print("Attempting to clear cart...");
+    debugPrint("Xóa toàn bộ giỏ hàng…");
     try {
-      // Kiểm tra đăng nhập
       if (_authProvider?.authStatus != AuthStatus.authenticated) {
         throw Exception("Vui lòng đăng nhập để xóa giỏ hàng.");
       }
       await _cartService.clearCart();
-      // SỬA: Thêm subtotal: 0.0 vào constructor Cart
+
+      // Tạo giỏ rỗng (giữ subtotal = 0 để UI hiển thị đúng)
       _cart = Cart(
         cartId: _cart?.cartId ?? '',
-        items: [],
+        items: <CartItem>[],
         subtotal: 0.0,
-      ); // Tạo cart rỗng
-      // --- KẾT THÚC SỬA ---
-      _status = CartStatus.loaded; // Trạng thái đã load (nhưng rỗng)
+      );
+      _status = CartStatus.loaded;
       _errorMessage = null;
-      print("Cart cleared successfully.");
+      debugPrint("Đã xóa giỏ hàng.");
+
       if (mounted) {
         SchedulerBinding.instance.addPostFrameCallback((_) {
           if (mounted) notifyListeners();
         });
       }
     } catch (e) {
-      print("Error clearing cart: $e");
+      debugPrint("Lỗi xóa giỏ hàng: $e");
       _errorMessage = e.toString();
       _status = CartStatus.error;
       if (mounted) {
@@ -204,16 +192,14 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  // --- THÊM MỚI: Biến kiểm tra mounted ---
+  /// Theo dõi vòng đời Provider
   bool _mounted = true;
   bool get mounted => _mounted;
-  // --- KẾT THÚC THÊM MỚI ---
 
-  // Dọn dẹp listener và cập nhật mounted khi Provider bị dispose
   @override
   void dispose() {
     _authProvider?.removeListener(_onAuthChanged);
-    _mounted = false; // <<< THÊM DÒNG NÀY
+    _mounted = false;
     super.dispose();
   }
 }

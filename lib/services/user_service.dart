@@ -6,6 +6,7 @@ class UserService {
 
   UserService(this._dio);
 
+  // Lấy thông tin hồ sơ người dùng hiện tại (GET /users/profile/me)
   Future<User> getMyProfile() async {
     try {
       final response = await _dio.get('/users/profile/me');

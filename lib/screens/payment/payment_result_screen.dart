@@ -51,9 +51,9 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
     try {
       final orderService = context.read<OrderService>();
       print(
-        "PaymentResultScreen: Checking final status for Order ID ${widget.orderId}",
+        "PaymentResultScreen: Đang kiểm tra trạng thái cuối cùng cho Đơn hàng ${widget.orderId}",
       );
-      // Gọi hàm trong OrderService (bạn sẽ thêm hàm này ở bước 3)
+      // Gọi hàm trong OrderService
       final statusResult = await orderService.checkOrderStatus(widget.orderId);
 
       if (mounted) {
@@ -61,17 +61,17 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
           _finalOrderStatus = statusResult; // Lưu trạng thái cuối cùng
           _isLoading = false;
           print(
-            "PaymentResultScreen: Final status received: $_finalOrderStatus",
+            "PaymentResultScreen: Đã nhận trạng thái cuối cùng: $_finalOrderStatus",
           );
         });
 
         if (_finalOrderStatus == 'paid' && context.mounted) {
-          print("Payment successful, refreshing cart state...");
+          print("Thanh toán thành công, làm mới giỏ hàng...");
           context.read<CartProvider>().fetchCart(force: true);
         }
       }
     } catch (e) {
-      print("PaymentResultScreen: Error checking order status: $e");
+      print("PaymentResultScreen: Lỗi khi kiểm tra trạng thái đơn hàng: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -207,17 +207,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                 ),
               ),
               const SizedBox(height: kDefaultPadding),
-              // Optional: Nút xem chi tiết đơn hàng (nếu bạn có màn hình đó)
-              // if (_finalOrderStatus == 'paid')
-              //   SizedBox(
-              //     width: double.infinity,
-              //     child: OutlinedButton(
-              //       child: const Text("Xem chi tiết đơn hàng"),
-              //       onPressed: () {
-              //         // Điều hướng đến màn hình chi tiết đơn hàng với widget.orderId
-              //       },
-              //     ),
-              //   ),
             ],
           ),
         ),

@@ -7,7 +7,7 @@ import 'package:ecom_frontend/widgets/primary_button.dart';
 import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
 
-// Enum để xác định mục đích của màn hình OTP
+/// Mục đích của màn hình OTP
 enum VerificationPurpose { verifyEmail, resetPassword }
 
 class VerificationScreen extends StatefulWidget {
@@ -28,6 +28,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   final _pinController = TextEditingController();
   bool _isLoading = false;
 
+  /// Xác nhận mã OTP (đăng ký hoặc quên mật khẩu)
   Future<void> _confirmCode() async {
     if (_pinController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,48 +41,77 @@ class _VerificationScreenState extends State<VerificationScreen> {
     final authProvider = context.read<AuthProvider>();
     String? error;
 
-    if (widget.purpose == VerificationPurpose.verifyEmail) {
-      // Logic cho xác thực email
-      error = await authProvider.verifyEmail(widget.email, _pinController.text);
-      if (mounted && error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Xác thực thành công! Vui lòng đăng nhập."),
-          ),
+    try {
+      if (widget.purpose == VerificationPurpose.verifyEmail) {
+        // Xác thực email sau khi đăng ký
+        error = await authProvider.verifyEmail(
+          widget.email,
+          _pinController.text,
         );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      }
-    } else {
-      // Logic cho reset mật khẩu
-      error = null;
-      if (mounted && error == null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CreateNewPasswordScreen(
-              email: widget.email,
-              code: _pinController.text,
-            ),
-          ),
-        );
-      }
-    }
 
-    if (mounted && error != null) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+        if (mounted && error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("✅ Xác thực thành công! Vui lòng đăng nhập."),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        // Kiểm tra mã OTP cho luồng quên mật khẩu
+        error = await authProvider.verifyResetCode(
+          widget.email,
+          _pinController.text,
+        );
+
+        if (mounted && error == null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CreateNewPasswordScreen(
+                email: widget.email,
+                code: _pinController.text,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+      if (mounted && error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error!.contains("Invalid") ||
+                      error!.contains("Sai") ||
+                      error!.contains("hết hạn")
+                  ? "❌ Mã xác thực không hợp lệ hoặc đã hết hạn."
+                  : error!,
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
   @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // --- PHẦN CHỈNH SỬA ---
     final defaultPinTheme = PinTheme(
       width: 56,
       height: 60,
@@ -89,16 +119,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        // Thay vì Colors.transparent, chúng ta dùng màu xám nhạt
         border: Border.all(color: kSecondaryTextColor.withValues(alpha: 0.4)),
       ),
     );
-    // --- KẾT THÚC PHẦN CHỈNH SỬA ---
 
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
-        title: const Text("Verification", style: TextStyle(color: kTextColor)),
+        title: const Text("Xác thực", style: TextStyle(color: kTextColor)),
         backgroundColor: kBackgroundColor,
         elevation: 0,
         leading: const BackButton(color: kTextColor),
@@ -109,7 +137,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
-              "OTP Code Verification",
+              "Xác thực mã OTP",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -118,15 +146,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              "We have sent an OTP code to your email\n${widget.email}",
+              "Chúng tôi đã gửi mã OTP tới email:\n${widget.email}",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16, color: kSecondaryTextColor),
             ),
             const SizedBox(height: 32),
             Pinput(
               controller: _pinController,
-              length: 6, // Backend yêu cầu 6 số
-              defaultPinTheme: defaultPinTheme, // Sử dụng theme đã chỉnh sửa
+              length: 6,
+              defaultPinTheme: defaultPinTheme,
               focusedPinTheme: defaultPinTheme.copyWith(
                 decoration: defaultPinTheme.decoration!.copyWith(
                   border: Border.all(color: kPrimaryColor, width: 2),
@@ -135,19 +163,37 @@ class _VerificationScreenState extends State<VerificationScreen> {
               onCompleted: (pin) => _confirmCode(),
             ),
             const SizedBox(height: 24),
-            // TODO: Thêm logic resend code
             TextButton(
-              onPressed: () {
-                /* TODO: Resend logic */
+              onPressed: () async {
+                // Gợi ý: gọi lại forgotPassword để gửi mã mới
+                // final auth = context.read<AuthProvider>();
+                // final err = await auth.forgotPassword(widget.email);
+                // if (err == null) {
+                //   ScaffoldMessenger.of(context).showSnackBar(
+                //     const SnackBar(
+                //       content: Text("Đã gửi lại mã xác thực."),
+                //       backgroundColor: Colors.green,
+                //       behavior: SnackBarBehavior.floating,
+                //     ),
+                //   );
+                // } else {
+                //   ScaffoldMessenger.of(context).showSnackBar(
+                //     SnackBar(
+                //       content: Text(err),
+                //       backgroundColor: Colors.redAccent,
+                //       behavior: SnackBarBehavior.floating,
+                //     ),
+                //   );
+                // }
               },
               child: const Text(
-                "Didn't receive email? Resend code",
+                "Không nhận được email? Gửi lại mã",
                 style: TextStyle(color: kSecondaryTextColor),
               ),
             ),
             const SizedBox(height: 24),
             PrimaryButton(
-              text: "Confirm",
+              text: "Xác nhận",
               onPressed: _confirmCode,
               isLoading: _isLoading,
             ),

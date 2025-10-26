@@ -8,14 +8,16 @@ class ApiClient {
   final StorageService _storageService;
 
   ApiClient(this.dio, this._storageService) {
+    // Cấu hình cơ bản
     dio.options.baseUrl = AppConfig.baseUrl;
     dio.options.connectTimeout = const Duration(seconds: 10);
     dio.options.receiveTimeout = const Duration(seconds: 10);
 
+    // Interceptor: gắn token và xử lý lỗi
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Lấy token từ storage
+          // Đính kèm Access Token nếu có
           final accessToken = await _storageService.readToken('access_token');
           if (accessToken != null) {
             options.headers['Authorization'] = 'Bearer $accessToken';
@@ -23,10 +25,9 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException e, handler) async {
-          // Xử lý lỗi 401 (Token hết hạn)
+          // 401: token hết hạn -> xóa token, buộc đăng nhập lại
           if (e.response?.statusCode == 401) {
             debugPrint("Token hết hạn, yêu cầu đăng nhập lại");
-            // Xóa token và chuyển về màn hình đăng nhập
             await _storageService.deleteAllTokens();
           }
           return handler.next(e);

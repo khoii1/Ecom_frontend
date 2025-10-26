@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart'; // Thêm thư viện intl để format tiền tệ
+import 'package:intl/intl.dart';
 
-// --- Giả định các file/class này đã tồn tại ---
-import 'package:ecom_frontend/models/product.dart'; // Model Product của bạn
-import 'package:ecom_frontend/services/product_service.dart'; // Service Product của bạn
-import 'package:ecom_frontend/widgets/primary_button.dart'; // Widget Button của bạn
-import 'package:ecom_frontend/providers/cart_provider.dart'; // Provider giỏ hàng
-import 'package:ecom_frontend/providers/product_provider.dart'; // Provider sản phẩm
-// SỬA: Thêm import cho CartScreen
-import 'package:ecom_frontend/screens/cart/cart_screen.dart'; // <<< THÊM DÒNG NÀY
-// --- KẾT THÚC SỬA ---
+import 'package:ecom_frontend/models/product.dart';
+import 'package:ecom_frontend/services/product_service.dart';
+import 'package:ecom_frontend/widgets/primary_button.dart';
+import 'package:ecom_frontend/providers/cart_provider.dart';
+import 'package:ecom_frontend/providers/product_provider.dart';
+import 'package:ecom_frontend/screens/cart/cart_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
-import 'package:flutter/scheduler.dart'; // Import SchedulerBinding
+import 'package:flutter/scheduler.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  final String productId; // ID sản phẩm được truyền vào
+  final String productId;
 
   const ProductDetailScreen({super.key, required this.productId});
 
@@ -24,10 +21,11 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  // State
   Product? _product;
   bool _isLoading = true;
   String? _errorMessage;
-  int _currentImageIndex = 0; // Để theo dõi ảnh đang hiển thị
+  int _currentImageIndex = 0;
 
   List<Product> _similarProducts = [];
   bool _isLoadingSimilar = true;
@@ -35,27 +33,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
     symbol: '₫',
-    decimalDigits: 0, // Bỏ phần thập phân
+    decimalDigits: 0,
   );
-
-  // --- THÊM MỚI: Biến kiểm tra mounted ---
-  // bool _mounted = true; // Không cần thiết trong StatefulWidget
 
   @override
   void initState() {
     super.initState();
-    // _mounted = true; // Không cần thiết
     _fetchProductDetails();
   }
 
-  // @override
-  // void dispose() {
-  //   _mounted = false; // Không cần thiết
-  //   super.dispose();
-  // }
-
+  // Tải chi tiết sản phẩm
   Future<void> _fetchProductDetails() async {
-    if (!mounted) return; // Kiểm tra mounted có sẵn trong State
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -66,29 +55,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final productData = await productService.getProductDetail(
         widget.productId,
       );
-      // Kiểm tra mounted lần nữa trước khi gọi setState
-      if (mounted) {
-        setState(() {
-          _product = productData;
-          _isLoading = false;
-          _errorMessage = null;
-        });
-        _fetchSimilarProducts();
-      }
+      if (!mounted) return;
+      setState(() {
+        _product = productData;
+        _isLoading = false;
+      });
+      _fetchSimilarProducts();
     } catch (e) {
-      print("Lỗi lấy chi tiết sản phẩm: $e");
-      if (mounted) {
-        // Kiểm tra mounted
-        setState(() {
-          _errorMessage = 'Không thể tải chi tiết sản phẩm: ${e.toString()}';
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Không thể tải chi tiết sản phẩm: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
+  // Lọc sản phẩm tương tự từ ProductProvider
   void _fetchSimilarProducts() {
-    // Kiểm tra mounted ở đầu hàm
     if (!mounted) return;
 
     if (_product == null || _product!.categoryId == null) {
@@ -98,11 +81,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     setState(() => _isLoadingSimilar = true);
 
-    ProductProvider? productProvider = context.read<ProductProvider>();
-    if (productProvider == null || productProvider.products.isEmpty) {
-      print("ProductProvider chưa sẵn sàng hoặc chưa có sản phẩm.");
-      if (mounted)
-        setState(() => _isLoadingSimilar = false); // Kiểm tra mounted
+    final productProvider = context.read<ProductProvider>();
+    if (productProvider.products.isEmpty) {
+      setState(() => _isLoadingSimilar = false);
       return;
     }
 
@@ -111,98 +92,71 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           .where(
             (p) => p.categoryId == _product!.categoryId && p.id != _product!.id,
           )
+          .toList()
+          .take(4)
           .toList();
 
-      final limitedSimilar = similar.take(4).toList();
-
-      if (mounted) {
-        // Kiểm tra mounted
-        setState(() {
-          _similarProducts = limitedSimilar;
-          _isLoadingSimilar = false;
-        });
-      }
-    } catch (e) {
-      print("Lỗi khi lọc sản phẩm tương tự: $e");
-      if (mounted) {
-        // Kiểm tra mounted
-        setState(() {
-          _isLoadingSimilar = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _similarProducts = similar;
+        _isLoadingSimilar = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingSimilar = false);
     }
   }
 
+  // Thêm vào giỏ
   void _addToCart() {
-    // Kiểm tra mounted trước khi truy cập context
-    if (!mounted) return;
-    if (_product != null) {
-      final cartProvider = context.read<CartProvider>();
-      try {
-        // Không cần await nếu chỉ hiển thị SnackBar ngay lập tức
-        cartProvider.addToCart(_product!.id);
-        // Kiểm tra mounted trước khi hiển thị SnackBar
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã thêm "${_product!.title}" vào giỏ hàng'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: kPrimaryColor,
-            ),
-          );
-        }
-        print('Thêm vào giỏ hàng: ${_product!.id}');
-      } catch (e) {
-        if (mounted) {
-          // Kiểm tra mounted
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi thêm vào giỏ: ${e.toString()}'),
-              backgroundColor: kHeartColor,
-            ),
-          );
-        }
-      }
+    if (!mounted || _product == null) return;
+    final cartProvider = context.read<CartProvider>();
+    try {
+      cartProvider.addToCart(_product!.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã thêm "${_product!.title}" vào giỏ hàng'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: kPrimaryColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi thêm vào giỏ: ${e.toString()}'),
+          backgroundColor: kHeartColor,
+        ),
+      );
     }
   }
 
+  // Mua ngay (thêm vào giỏ rồi điều hướng sang giỏ)
   void _buyNow() async {
-    // <<< Thêm async
-    // Kiểm tra mounted trước khi truy cập context
-    if (!mounted) return;
-    if (_product != null) {
-      final cartProvider = context.read<CartProvider>();
-      try {
-        // 1. Thêm sản phẩm vào giỏ hàng (giống logic của _addToCart)
-        await cartProvider.addToCart(_product!.id); // <<< Thêm await
-
-        // 2. Kiểm tra mounted lần nữa trước khi điều hướng
-        if (mounted) {
-          // 3. Điều hướng đến màn hình giỏ hàng
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  CartScreen(), // Bỏ const nếu CartScreen không phải const
-            ),
-          );
-        }
-      } catch (e) {
-        // Xử lý lỗi nếu thêm vào giỏ hàng thất bại
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi khi thêm vào giỏ: ${e.toString()}'),
-              backgroundColor: kHeartColor, // Màu báo lỗi
-            ),
-          );
-        }
-      }
+    if (!mounted || _product == null) return;
+    final cartProvider = context.read<CartProvider>();
+    try {
+      await cartProvider.addToCart(_product!.id);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CartScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi khi thêm vào giỏ: ${e.toString()}'),
+          backgroundColor: kHeartColor,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // AppBar
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
@@ -219,23 +173,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.white),
             onPressed: () {
-              // TODO: Xử lý thêm vào yêu thích
+              // TODO: Yêu thích
             },
           ),
-          // SỬA: Thêm hành động điều hướng cho IconButton giỏ hàng
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
             onPressed: () {
-              // Điều hướng đến CartScreen
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => CartScreen(),
-                ), // Bỏ const nếu CartScreen không const
+                MaterialPageRoute(builder: (context) => CartScreen()),
               );
             },
           ),
-          // --- KẾT THÚC SỬA ---
         ],
       ),
       body: _buildBody(),
@@ -243,6 +192,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Body (loading / error / content)
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
@@ -303,12 +253,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             padding: const EdgeInsets.all(kDefaultPadding),
             child: _buildSimilarProductsSection(),
           ),
-          const SizedBox(height: 80), // Khoảng trống cho bottom buttons
+          const SizedBox(height: 80),
         ],
       ),
     );
   }
 
+  // Slider ảnh
   Widget _buildImageSlider(List<String> images) {
     if (images.isEmpty) {
       return Container(
@@ -333,7 +284,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           PageView.builder(
             itemCount: images.length,
             onPageChanged: (index) {
-              // Kiểm tra mounted trước khi gọi setState
               if (mounted) setState(() => _currentImageIndex = index);
             },
             itemBuilder: (context, index) {
@@ -392,8 +342,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Khối thông tin sản phẩm
   Widget _buildProductInfo() {
-    bool hasDiscount =
+    final hasDiscount =
         _product!.discountPercentage != null &&
         _product!.discountPercentage! > 0;
 
@@ -401,9 +352,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start, // Căn trên cùng
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cột Tên + Rating + Sold
+            // Tên + đánh giá + đã bán
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,32 +388,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       const SizedBox(width: kDefaultPadding / 2),
                       const Text(
-                        '8,374 sold',
+                        'Đã bán 8.374',
                         style: TextStyle(color: kSecondaryTextColor),
-                      ), // Dữ liệu giả định
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: kDefaultPadding),
-            // Cột Giá + Discount Badge
+            // Giá + badge giảm
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end, // Căn phải
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   currencyFormatter.format(
                     _product!.finalPrice ?? _product!.price,
                   ),
                   style: const TextStyle(
-                    fontSize: 24, // To hơn chút
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: kBrownDark,
                   ),
                 ),
                 if (hasDiscount) ...[
-                  // Dùng spread operator để thêm nhiều widget
-                  const SizedBox(height: 2), // Khoảng cách nhỏ
+                  const SizedBox(height: 2),
                   Text(
                     currencyFormatter.format(_product!.price),
                     style: const TextStyle(
@@ -485,13 +435,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       border: Border.all(
                         color: kHeartColor.withOpacity(0.5),
                         width: 1,
-                      ), // Viền nhạt hơn
+                      ),
                     ),
                     child: Text(
                       '-${_product!.discountPercentage!.toInt()}%',
                       style: const TextStyle(
                         color: kHeartColor,
-                        fontSize: 12, // Nhỏ hơn
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -504,7 +454,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
         const SizedBox(height: kDefaultPadding),
 
-        // --- Mô tả sản phẩm ---
+        // Mô tả
         const Text(
           "Mô tả sản phẩm",
           style: TextStyle(
@@ -526,6 +476,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Khu vực sản phẩm tương tự
   Widget _buildSimilarProductsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,7 +494,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             TextButton(
               onPressed: () {
-                /* TODO: Navigate */
+                /* TODO: Điều hướng xem tất cả */
               },
               child: const Text(
                 'Xem tất cả',
@@ -586,6 +537,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Card sản phẩm tương tự
   Widget _buildSimilarProductCard(Product product) {
     return GestureDetector(
       onTap: () {
@@ -593,7 +545,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailScreen(productId: product.id),
-          ), // Thêm context
+          ),
         );
       },
       child: Container(
@@ -688,6 +640,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Nút đáy (thêm giỏ / mua ngay)
   Widget _buildBottomButtons() {
     return Container(
       padding: const EdgeInsets.symmetric(

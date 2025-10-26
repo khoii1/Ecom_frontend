@@ -28,18 +28,26 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  /// Đổi mật khẩu với mã OTP hợp lệ
   Future<void> _resetPassword() async {
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Mật khẩu không khớp")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("❌ Mật khẩu không khớp"),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
-    // Validate mật khẩu 6 ký tự
     if (_passwordController.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mật khẩu phải ít nhất 6 ký tự")),
+        const SnackBar(
+          content: Text("Mật khẩu phải ít nhất 6 ký tự"),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -53,25 +61,38 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
       newPassword: _passwordController.text,
     );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Đổi mật khẩu thành công! Vui lòng đăng nhập lại."),
-          ),
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-      }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Đổi mật khẩu thành công! Vui lòng đăng nhập lại."),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -79,7 +100,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
-        title: const Text("Password", style: TextStyle(color: kTextColor)),
+        title: const Text("Mật khẩu mới", style: TextStyle(color: kTextColor)),
         backgroundColor: kBackgroundColor,
         elevation: 0,
         leading: const BackButton(color: kTextColor),
@@ -90,7 +111,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Create New Password",
+              "Tạo mật khẩu mới",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -99,13 +120,13 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Create your new password.",
+              "Nhập mật khẩu mới cho tài khoản của bạn.",
               style: TextStyle(fontSize: 16, color: kSecondaryTextColor),
             ),
             const SizedBox(height: 32),
             CustomTextField(
               controller: _passwordController,
-              labelText: "New Password",
+              labelText: "Mật khẩu mới",
               prefixIcon: Icons.lock_outline,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
@@ -115,15 +136,15 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                       : Icons.visibility_outlined,
                   color: kSecondaryTextColor,
                 ),
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
+                onPressed: () => setState(() {
+                  _obscurePassword = !_obscurePassword;
+                }),
               ),
             ),
             const SizedBox(height: 20),
             CustomTextField(
               controller: _confirmPasswordController,
-              labelText: "Confirm Password",
+              labelText: "Xác nhận mật khẩu",
               prefixIcon: Icons.lock_outline,
               obscureText: _obscureConfirmPassword,
               suffixIcon: IconButton(
@@ -133,16 +154,14 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                       : Icons.visibility_outlined,
                   color: kSecondaryTextColor,
                 ),
-                onPressed: () {
-                  setState(
-                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                  );
-                },
+                onPressed: () => setState(() {
+                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                }),
               ),
             ),
             const SizedBox(height: 32),
             PrimaryButton(
-              text: "Continue",
+              text: "Tiếp tục",
               onPressed: _resetPassword,
               isLoading: _isLoading,
             ),

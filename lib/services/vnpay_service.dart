@@ -1,22 +1,23 @@
 import 'package:dio/dio.dart';
-import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
+import 'package:url_launcher/url_launcher.dart'; // Dùng để mở URL trong trình duyệt
 
 class VnpayService {
   final Dio _dio;
 
   VnpayService(this._dio);
 
-  /// Gọi backend để tạo URL thanh toán VNPay
+  // ===== TẠO URL THANH TOÁN VNPay =====
+  // Gọi API backend (POST /payment/vnpay/create_payment_url)
+  // để tạo đường dẫn thanh toán qua VNPay cho đơn hàng cụ thể
   Future<String?> createPaymentUrl({
     required String orderId,
     required double amount,
     String language = 'vn',
-    String? bankCode, // Optional
+    String? bankCode, // Tùy chọn mã ngân hàng
   }) async {
     try {
-      print(
-        "Requesting VNPay URL from backend for Order ID: $orderId, Amount: $amount",
-      );
+      print("Gửi yêu cầu tạo VNPay URL (Order ID: $orderId, Số tiền: $amount)");
+
       final response = await _dio.post(
         '/payment/vnpay/create_payment_url',
         data: {
@@ -28,59 +29,45 @@ class VnpayService {
       );
 
       if (response.data != null && response.data['paymentUrl'] != null) {
-        print("Received VNPay URL: ${response.data['paymentUrl']}");
+        print("Đã nhận được VNPay URL: ${response.data['paymentUrl']}");
         return response.data['paymentUrl'];
       } else {
-        throw Exception('Không nhận được URL thanh toán từ server');
+        throw Exception('Không nhận được URL thanh toán từ máy chủ');
       }
-      // Sửa: Bỏ Future<dynamic>
     } on DioException catch (e) {
-      // <<< SỬA
-      print("DioException creating VNPay URL: ${e.response?.data}");
+      // Bắt lỗi từ backend
+      print("DioException khi tạo VNPay URL: ${e.response?.data}");
       throw Exception(
-        e.response?.data['message'] ?? 'Lỗi tạo URL thanh toán VNPay',
+        e.response?.data['message'] ?? 'Lỗi khi tạo URL thanh toán VNPay',
       );
     } catch (e) {
-      print("Unknown error creating VNPay URL: $e");
+      // Bắt lỗi không mong muốn
+      print("Lỗi không xác định khi tạo VNPay URL: $e");
       throw Exception('Lỗi không xác định khi tạo URL thanh toán VNPay');
     }
   }
 
-  /// Mở URL thanh toán VNPay
-  /// Trả về true nếu mở thành công, false nếu thất bại
+  // ===== MỞ URL THANH TOÁN =====
+  // Mở đường dẫn VNPay trong trình duyệt ngoài của thiết bị
+  // Trả về true nếu mở thành công, false nếu thất bại
   Future<bool> launchVNPayUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (!await canLaunchUrl(url)) {
-      print("Could not launch $url");
+      print("Không thể mở $url");
       return false;
     }
-    // Mở trong trình duyệt ngoài (an toàn và đơn giản nhất)
+
+    // Mở bằng trình duyệt ngoài (cách an toàn và phổ biến nhất)
     final bool launched = await launchUrl(
       url,
       mode: LaunchMode.externalApplication,
     );
+
     if (!launched) {
-      print("Failed to launch $url externally");
-      // Có thể thử lại với WebView nếu external không được
-      // final bool launchedInApp = await launchUrl(url, mode: LaunchMode.inAppWebView);
-      // return launchedInApp;
+      print("Không thể mở $url bằng trình duyệt ngoài");
+      // Có thể thử lại với WebView nếu cần:
+      // await launchUrl(url, mode: LaunchMode.inAppWebView);
     }
     return launched;
   }
-
-  // Optional: Nếu dùng WebView
-  // Widget buildVnpayWebView(String url) {
-  //   return WebView(
-  //     initialUrl: url,
-  //     javascriptMode: JavascriptMode.unrestricted,
-  //     navigationDelegate: (NavigationRequest request) {
-  //       if (request.url.startsWith(process.env.FRONTEND_PAYMENT_REDIRECT_URL)) { // <<< CẦN CHECK URL CHÍNH XÁC
-  //         print('Intercepted redirect: ${request.url}');
-  //         // TODO: Parse params from request.url, close webview, navigate to result screen
-  //         return NavigationDecision.prevent; // Ngăn không cho WebView điều hướng
-  //       }
-  //       return NavigationDecision.navigate; // Cho phép điều hướng đến cổng VNPay
-  //     },
-  //   );
-  // }
 }

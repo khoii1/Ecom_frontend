@@ -6,16 +6,16 @@ class StoreService {
 
   StoreService(this._dio);
 
-  // GET /stores/my/stores - Lấy các cửa hàng của user hiện tại
+  // Lấy danh sách cửa hàng thuộc người dùng hiện tại (GET /stores/my/stores)
   Future<List<Store>> getMyStores() async {
     try {
       final response = await _dio.get('/stores/my/stores');
       final List<dynamic> data = response.data;
       return data.map((json) => Store.fromJson(json)).toList();
     } on DioException catch (e) {
-      // Có thể user chưa có store nào -> trả về list rỗng thay vì ném lỗi
+      // Nếu user chưa có cửa hàng nào -> trả về danh sách rỗng
       if (e.response?.statusCode == 404) {
-        return []; // Hoặc xử lý theo cách khác nếu backend trả 404
+        return [];
       }
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi lấy cửa hàng');
     } catch (e) {
@@ -23,5 +23,5 @@ class StoreService {
     }
   }
 
-  // Thêm các hàm khác nếu cần (createStore, updateStore, etc.)
+  // Có thể bổ sung thêm hàm tạo / cập nhật cửa hàng (createStore, updateStore, ...)
 }

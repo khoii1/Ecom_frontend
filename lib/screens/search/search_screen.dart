@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/providers/product_provider.dart';
-import 'package:ecom_frontend/screens/product/product_detail_screen.dart'; // Để điều hướng đến chi tiết
+import 'package:ecom_frontend/screens/product/product_detail_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -13,24 +15,27 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  // State & formatter
   final TextEditingController _searchController = TextEditingController();
+  final NumberFormat _currency = NumberFormat.currency(
+    locale: 'vi_VN',
+    symbol: 'đ',
+    decimalDigits: 0,
+  );
+
   List<Product> _searchResults = [];
   bool _isLoading = false;
-  String _currentQuery = ""; // Lưu trữ query hiện tại
+  String _currentQuery = "";
 
   @override
   void initState() {
     super.initState();
-    // Lấy tất cả sản phẩm ban đầu hoặc để trống
+    // Tải dữ liệu ban đầu
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Lấy toàn bộ sản phẩm từ ProductProvider để lọc ban đầu
-      _performSearch(""); // Hiển thị tất cả ban đầu (hoặc không hiển thị gì)
+      _performSearch("");
     });
-
-    // Lắng nghe thay đổi text input
+    // Lắng nghe thay đổi ô tìm kiếm
     _searchController.addListener(() {
-      // Dùng debounce để tránh search quá nhiều lần khi gõ nhanh
-      // (Trong ví dụ này, search ngay lập tức để đơn giản)
       if (_searchController.text != _currentQuery) {
         _performSearch(_searchController.text);
       }
@@ -43,52 +48,44 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  // Hàm thực hiện tìm kiếm (lọc từ danh sách đã có)
+  // Lọc kết quả theo từ khóa
   void _performSearch(String query) {
-    if (!mounted) return; // Kiểm tra widget còn tồn tại
+    if (!mounted) return;
 
     setState(() {
-      _isLoading = true; // Bắt đầu loading
-      _currentQuery = query.toLowerCase(); // Lưu query hiện tại (chữ thường)
+      _isLoading = true;
+      _currentQuery = query.toLowerCase();
     });
 
-    // Lấy danh sách sản phẩm gốc từ Provider
     final allProducts = context.read<ProductProvider>().products;
 
-    // Lọc sản phẩm
     if (_currentQuery.isEmpty) {
-      // Nếu query rỗng, hiển thị tất cả (hoặc không hiển thị gì tùy ý)
-      _searchResults = List.from(allProducts); // Sao chép danh sách gốc
+      _searchResults = List.from(allProducts);
     } else {
-      _searchResults = allProducts.where((product) {
-        final titleLower = product.title.toLowerCase();
-        // Tìm kiếm đơn giản trong title
+      _searchResults = allProducts.where((p) {
+        final titleLower = p.title.toLowerCase();
         return titleLower.contains(_currentQuery);
-        // Có thể mở rộng tìm kiếm trong description, category,...
       }).toList();
     }
 
-    // Kết thúc loading sau một khoảng trễ nhỏ để UI kịp cập nhật
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     });
   }
 
-  // --- AppBar Tùy chỉnh với Search Bar ---
+  // AppBar có ô tìm kiếm
   AppBar _buildSearchBar(BuildContext context) {
     return AppBar(
       backgroundColor: kPrimaryColor,
-      elevation: 1, // Shadow nhẹ
+      elevation: 1,
       shadowColor: Colors.black.withOpacity(0.1),
-      automaticallyImplyLeading: false, // Ẩn nút back
+      automaticallyImplyLeading: false,
       titleSpacing: kDefaultPadding,
       title: TextField(
         controller: _searchController,
-        autofocus: true, // Tự động focus khi vào trang
+        autofocus: true,
         decoration: InputDecoration(
-          hintText: "Search Outfit...", // Giống thiết kế
+          hintText: "Tìm kiếm sản phẩm...",
           hintStyle: TextStyle(
             color: kSecondaryTextColor.withOpacity(0.7),
             fontSize: 15,
@@ -99,10 +96,8 @@ class _SearchScreenState extends State<SearchScreen> {
             size: 22,
           ),
           filled: true,
-          fillColor: kOffWhiteColor, // Màu nền search bar
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 12,
-          ), // Padding dọc
+          fillColor: kOffWhiteColor,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(25),
             borderSide: BorderSide.none,
@@ -118,7 +113,6 @@ class _SearchScreenState extends State<SearchScreen> {
               width: 1,
             ),
           ),
-          // Nút xóa text
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(
@@ -128,7 +122,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   onPressed: () {
                     _searchController.clear();
-                    // _performSearch(""); // Gọi lại search khi xóa
                   },
                 )
               : null,
@@ -136,11 +129,10 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       actions: [
         IconButton(
-          // Icon filter (giống thiết kế)
           icon: Icon(Icons.filter_list_alt, color: kTextColor.withOpacity(0.8)),
           onPressed: () {
-            // TODO: Implement Filter functionality
-            print("Filter button pressed");
+            // TODO: Bộ lọc
+            print("Nhấn nút Bộ lọc");
           },
         ),
         const SizedBox(width: kDefaultPadding / 2),
@@ -148,7 +140,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // --- Hiển thị thông tin kết quả ---
+  // Header kết quả
   Widget _buildResultHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -159,11 +151,10 @@ class _SearchScreenState extends State<SearchScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Flexible(
-            // Sử dụng Flexible để tránh text overflow
             child: Text(
               _currentQuery.isEmpty
-                  ? "Showing All Products"
-                  : 'Showing "${_searchController.text}"', // Hiển thị query gốc
+                  ? "Hiển thị tất cả sản phẩm"
+                  : 'Kết quả cho "${_searchController.text}"',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
@@ -172,9 +163,9 @@ class _SearchScreenState extends State<SearchScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (!_isLoading) // Chỉ hiển thị số lượng khi không loading
+          if (!_isLoading)
             Text(
-              "${_searchResults.length} Results",
+              "${_searchResults.length} kết quả",
               style: const TextStyle(fontSize: 13, color: kSecondaryTextColor),
             ),
         ],
@@ -182,7 +173,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // --- Lưới hiển thị kết quả tìm kiếm ---
+  // Lưới kết quả
   Widget _buildSearchResultsGrid(BuildContext context) {
     if (_isLoading) {
       return const Center(
@@ -193,38 +184,33 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_searchResults.isEmpty && _currentQuery.isNotEmpty) {
-      return const Center(child: Text("No products found for your search."));
+      return const Center(child: Text("Không tìm thấy sản phẩm phù hợp."));
     }
     if (_searchResults.isEmpty && _currentQuery.isEmpty) {
-      return const Center(
-        child: Text("Enter a keyword to search."),
-      ); // Hoặc hiển thị gợi ý
+      return const Center(child: Text("Nhập từ khóa để bắt đầu tìm kiếm."));
     }
 
-    // Sử dụng lại widget card từ HomeScreenContent (có thể tách ra thành widget riêng)
     return GridView.builder(
-      // shrinkWrap: true, // Không cần shrinkWrap khi dùng Expanded
-      // physics: const NeverScrollableScrollPhysics(), // Không cần physics khi dùng Expanded
       padding: const EdgeInsets.symmetric(
         horizontal: kDefaultPadding / 1.5,
-      ).copyWith(bottom: kDefaultPadding), // Padding cho Grid
+      ).copyWith(bottom: kDefaultPadding),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.65, // Tỉ lệ giống trang Home
-        crossAxisSpacing: kDefaultPadding / 1.5, // Khoảng cách ngang
-        mainAxisSpacing: kDefaultPadding / 1.5, // Khoảng cách dọc
+        childAspectRatio: 0.65,
+        crossAxisSpacing: kDefaultPadding / 1.5,
+        mainAxisSpacing: kDefaultPadding / 1.5,
       ),
       itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final product = _searchResults[index];
-        // Sử dụng widget card tương tự như trên HomeScreen
-        return _buildPopularProductCard(context, product);
-      },
+      itemBuilder: (context, index) =>
+          _buildProductCard(context, _searchResults[index]),
     );
   }
 
-  // --- Widget Card cho Sản phẩm (Giống HomeScreenContent) ---
-  Widget _buildPopularProductCard(BuildContext context, Product product) {
+  // Card sản phẩm
+  Widget _buildProductCard(BuildContext context, Product product) {
+    final hasDiscount =
+        product.discountPercentage != null && product.discountPercentage! > 0;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -250,6 +236,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Ảnh + nút yêu thích
             Expanded(
               child: Stack(
                 children: [
@@ -265,7 +252,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(12),
                       ),
-                      child: product.imageUrl != null
+                      child:
+                          product.imageUrl != null &&
+                              product.imageUrl!.isNotEmpty
                           ? Image.network(
                               product.imageUrl!,
                               fit: BoxFit.contain,
@@ -302,9 +291,9 @@ class _SearchScreenState extends State<SearchScreen> {
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () {
-                        print("Toggle favorite for ${product.title}");
-                      },
+                      onTap: () => print(
+                        "Chuyển trạng thái yêu thích: ${product.title}",
+                      ),
                       child: CircleAvatar(
                         radius: 16,
                         backgroundColor: Colors.white.withOpacity(0.8),
@@ -319,6 +308,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
+            // Thông tin sản phẩm
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Column(
@@ -338,44 +328,41 @@ class _SearchScreenState extends State<SearchScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text:
-                                  "\$${product.finalPrice?.toStringAsFixed(2) ?? product.price.toStringAsFixed(2)}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: kPrimaryColor,
-                                fontSize: 15,
-                              ),
+                      // Giá + badge giảm giá
+                      Row(
+                        children: [
+                          Text(
+                            _currency.format(
+                              product.finalPrice ?? product.price,
                             ),
-                            if (product.discountPercentage != null &&
-                                product.discountPercentage! > 0)
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Container(
-                                  margin: const EdgeInsets.only(left: 4),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '-${product.discountPercentage!.toInt()}%',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                    ),
-                                  ),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: kPrimaryColor,
+                              fontSize: 15,
+                            ),
+                          ),
+                          if (hasDiscount)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '-${product.discountPercentage!.toInt()}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
+                      // Rating (nếu có)
                       if (product.rating != null)
                         Row(
                           children: [
@@ -406,6 +393,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  // Layout tổng
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -413,8 +401,7 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: _buildSearchBar(context),
       body: Column(
         children: [
-          _buildResultHeader(), // Header thông tin kết quả
-          // Sử dụng Expanded để GridView chiếm hết không gian còn lại
+          _buildResultHeader(),
           Expanded(child: _buildSearchResultsGrid(context)),
         ],
       ),

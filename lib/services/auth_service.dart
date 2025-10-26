@@ -5,25 +5,25 @@ class AuthService {
 
   AuthService(this._dio);
 
+  // ===== Đăng nhập =====
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final response = await _dio.post(
         '/auth/login',
         data: {'email': email, 'password': password},
       );
-
       return response.data;
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Lỗi đăng nhập');
     }
   }
 
-  // --- CẬP NHẬT HÀM NÀY ---
+  // ===== Đăng ký tài khoản =====
   Future<Map<String, dynamic>> register({
     required String fullName,
     required String email,
     required String password,
-    required String role, // Thêm 'required'
+    required String role,
   }) async {
     try {
       final response = await _dio.post(
@@ -41,6 +41,7 @@ class AuthService {
     }
   }
 
+  // ===== Xác thực email (OTP đăng ký) =====
   Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
     try {
       final response = await _dio.post(
@@ -53,6 +54,7 @@ class AuthService {
     }
   }
 
+  // ===== Quên mật khẩu =====
   Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
       final response = await _dio.post(
@@ -61,10 +63,29 @@ class AuthService {
       );
       return response.data;
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi gửi email');
+      throw Exception(e.response?.data['message'] ?? 'Lỗi gửi email khôi phục');
     }
   }
 
+  // ===== Kiểm tra mã OTP khôi phục mật khẩu =====
+  Future<Map<String, dynamic>> verifyResetCode(
+    String email,
+    String code,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/auth/verify-reset-code',
+        data: {'email': email, 'code': code},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Mã xác thực không hợp lệ',
+      );
+    }
+  }
+
+  // ===== Đặt lại mật khẩu =====
   Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String code,

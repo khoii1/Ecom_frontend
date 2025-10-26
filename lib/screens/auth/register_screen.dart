@@ -20,39 +20,83 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  // --- THÊM MỚI: State để lưu role đã chọn ---
-  String _selectedRole = 'USER'; // Giá trị mặc định
+  /// Vai trò người dùng chọn (USER/SELLER)
+  String _selectedRole = 'USER';
 
   Future<void> _register() async {
-    setState(() => _isLoading = true);
+    // Validate cơ bản
+    if (_nameController.text.trim().length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Tên phải có ít nhất 2 ký tự."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (!_emailController.text.contains("@")) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Email không hợp lệ."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_passwordController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Mật khẩu phải ít nhất 6 ký tự."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
+    setState(() => _isLoading = true);
     final authProvider = context.read<AuthProvider>();
-    // --- CẬP NHẬT: Thêm role vào hàm register ---
+
     final error = await authProvider.register(
-      fullName: _nameController.text,
-      email: _emailController.text,
+      fullName: _nameController.text.trim(),
+      email: _emailController.text.trim(),
       password: _passwordController.text,
-      role: _selectedRole, // Lấy giá trị từ state
+      role: _selectedRole,
     );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (error == null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerificationScreen(
-              email: _emailController.text,
-              purpose: VerificationPurpose.verifyEmail,
-            ),
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      // Đăng ký thành công → chuyển sang nhập OTP để xác thực email
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VerificationScreen(
+            email: _emailController.text.trim(),
+            purpose: VerificationPurpose.verifyEmail,
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-      }
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -66,7 +110,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Create Account",
+              "Tạo tài khoản",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -75,30 +119,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Create your account to explore",
+              "Đăng ký để bắt đầu mua sắm và bán hàng.",
               style: TextStyle(fontSize: 16, color: kSecondaryTextColor),
             ),
             const SizedBox(height: 32),
+
             CustomTextField(
               controller: _nameController,
-              labelText: "Name",
+              labelText: "Họ và tên",
               prefixIcon: Icons.person_outline,
             ),
             const SizedBox(height: 20),
+
             CustomTextField(
               controller: _emailController,
-              labelText: "Email",
+              labelText: "Địa chỉ Email",
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
 
-            // --- THAY THẾ CustomTextField("Role") BẰNG DropdownButtonFormField ---
+            // Chọn vai trò đăng ký
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Role",
+                  "Vai trò",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: kTextColor,
@@ -107,21 +153,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedRole,
+                  value: _selectedRole,
                   items: const [
                     DropdownMenuItem(
                       value: 'USER',
-                      child: Text('User (Customer)'),
+                      child: Text('Người dùng (Mua hàng)'),
                     ),
                     DropdownMenuItem(
                       value: 'SELLER',
-                      child: Text('Seller (Vendor)'),
+                      child: Text('Người bán (Cửa hàng)'),
                     ),
                   ],
                   onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedRole = newValue!;
-                    });
+                    if (newValue == null) return;
+                    setState(() => _selectedRole = newValue);
                   },
                   decoration: InputDecoration(
                     prefixIcon: const Icon(
@@ -150,11 +195,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
 
-            // --- KẾT THÚC THAY THẾ ---
             const SizedBox(height: 20),
+
             CustomTextField(
               controller: _passwordController,
-              labelText: "Password",
+              labelText: "Mật khẩu",
               prefixIcon: Icons.lock_outline,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
@@ -169,26 +214,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 },
               ),
             ),
+
             const SizedBox(height: 24),
+
             PrimaryButton(
-              text: "Register with Email",
+              text: "Đăng ký bằng Email",
               onPressed: _register,
               isLoading: _isLoading,
             ),
+
             const SizedBox(height: 32),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Already have an account? ",
+                  "Đã có tài khoản? ",
                   style: TextStyle(color: kSecondaryTextColor),
                 ),
                 TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                   child: const Text(
-                    "Login",
+                    "Đăng nhập",
                     style: TextStyle(
                       color: kPrimaryColor,
                       fontWeight: FontWeight.bold,

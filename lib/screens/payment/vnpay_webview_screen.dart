@@ -1,23 +1,15 @@
-import 'dart:async'; // Cần cho Completer
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:ecom_frontend/utils/constants.dart';
-// Import màn hình kết quả
 import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
 
 class VnpayWebViewScreen extends StatefulWidget {
-  // Định nghĩa routeName
   static const String routeName = '/vnpay-webview';
 
   final String paymentUrl;
-  // Bạn có thể truyền thêm orderId nếu cần, nhưng chỉ cần parse từ returnUrl là đủ
-  // final String orderId;
 
-  const VnpayWebViewScreen({
-    super.key,
-    required this.paymentUrl,
-    // required this.orderId,
-  });
+  const VnpayWebViewScreen({super.key, required this.paymentUrl});
 
   @override
   State<VnpayWebViewScreen> createState() => _VnpayWebViewScreenState();
@@ -45,7 +37,7 @@ class _VnpayWebViewScreenState extends State<VnpayWebViewScreen> {
         NavigationDelegate(
           onProgress: (int progress) {
             // Cập nhật trạng thái loading nếu cần
-            print('WebView is loading (progress : $progress%)');
+            print('WebView đang tải (tiến độ: $progress%)');
             if (progress == 100 && _isLoadingPage && mounted) {
               setState(() {
                 _isLoadingPage = false; // Hoàn thành tải trang ban đầu
@@ -53,7 +45,7 @@ class _VnpayWebViewScreenState extends State<VnpayWebViewScreen> {
             }
           },
           onPageStarted: (String url) {
-            print('Page started loading: $url');
+            print('Bắt đầu tải trang: $url');
             if (mounted) {
               setState(() {
                 _isLoadingPage = true; // Bắt đầu tải trang mới
@@ -61,7 +53,7 @@ class _VnpayWebViewScreenState extends State<VnpayWebViewScreen> {
             }
           },
           onPageFinished: (String url) {
-            print('Page finished loading: $url');
+            print('Hoàn tất tải trang: $url');
             if (mounted) {
               setState(() {
                 _isLoadingPage = false; // Hoàn thành tải trang mới
@@ -69,13 +61,12 @@ class _VnpayWebViewScreenState extends State<VnpayWebViewScreen> {
             }
           },
           onWebResourceError: (WebResourceError error) {
-            print('''
-Page resource error:
-  code: ${error.errorCode}
-  description: ${error.description}
-  errorType: ${error.errorType}
-  isForMainFrame: ${error.isForMainFrame}
-          ''');
+            print('''Lỗi tài nguyên trang:
+  mã lỗi: ${error.errorCode}
+  mô tả: ${error.description}
+  loại lỗi: ${error.errorType}
+  khung chính: ${error.isForMainFrame}
+''');
             // Có thể hiển thị lỗi cho người dùng nếu cần
             if (mounted) {
               setState(() {
@@ -86,13 +77,13 @@ Page resource error:
           },
           // --- QUAN TRỌNG: Xử lý chuyển hướng ---
           onNavigationRequest: (NavigationRequest request) {
-            print('Allowing navigation to ${request.url}');
+            print('Cho phép điều hướng tới: ${request.url}');
             final Uri uri = Uri.parse(request.url);
 
             // Kiểm tra xem có phải là deep link trả về không
             if (uri.scheme == _targetReturnScheme &&
                 uri.host == _targetReturnHost) {
-              print('Intercepted return deep link: ${request.url}');
+              print('Chặn và xử lý deep link trả về: ${request.url}');
               // Ngăn WebView điều hướng đến deep link
               _handleReturnUrl(uri); // Gọi hàm xử lý và điều hướng
               return NavigationDecision.prevent;
@@ -110,14 +101,14 @@ Page resource error:
   void _handleReturnUrl(Uri uri) {
     if (!mounted) return; // Kiểm tra
 
-    print("Handling payment result deep link from WebView...");
+    print("Xử lý kết quả thanh toán từ WebView...");
     final orderId = uri.queryParameters['orderId'];
     final status = uri.queryParameters['status'];
     final message = uri.queryParameters['message'];
     final vnpResponseCode = uri.queryParameters['vnp_ResponseCode'];
 
     print(
-      "Parsed Params: orderId=$orderId, status=$status, message=$message, vnpCode=$vnpResponseCode",
+      "Tham số parse được: orderId=$orderId, status=$status, message=$message, vnpCode=$vnpResponseCode",
     );
 
     if (orderId != null) {
@@ -134,7 +125,7 @@ Page resource error:
         },
       );
     } else {
-      print("Payment result deep link is missing orderId.");
+      print("Deep link kết quả thanh toán thiếu orderId.");
       // Hiển thị lỗi và pop về màn hình trước (Cart)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Lỗi xử lý kết quả: Thiếu mã đơn hàng.")),

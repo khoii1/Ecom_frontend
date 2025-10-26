@@ -151,7 +151,7 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
       const SearchScreen(), // Search (index 1)
       Scaffold(
         // Profile (index 2)
-        appBar: AppBar(title: const Text('Profile')),
+        appBar: AppBar(title: const Text('Tài khoản')),
         body: Center(
           child: ElevatedButton(
             onPressed: () => context.read<AuthProvider>().logout(),
@@ -214,23 +214,23 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
       const BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         activeIcon: Icon(Icons.home),
-        label: 'Home',
+        label: 'Trang chủ',
       ),
       const BottomNavigationBarItem(
         icon: Icon(Icons.search_outlined),
         activeIcon: Icon(Icons.search),
-        label: 'Search',
+        label: 'Tìm kiếm',
       ),
       if (canAddProduct)
         const BottomNavigationBarItem(
           icon: Icon(Icons.add_circle_outline, size: 28),
           activeIcon: Icon(Icons.add_circle, size: 28),
-          label: 'Add',
+          label: 'Thêm',
         ),
       const BottomNavigationBarItem(
         icon: Icon(Icons.person_outline),
         activeIcon: Icon(Icons.person),
-        label: 'Profile',
+        label: 'Tài khoản',
       ),
     ];
 
@@ -351,7 +351,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         },
         readOnly: true,
         decoration: InputDecoration(
-          hintText: "Search Outfit",
+          hintText: "Tìm kiếm sản phẩm",
           hintStyle: TextStyle(
             color: kSecondaryTextColor.withOpacity(0.7),
             fontSize: 14,
@@ -549,7 +549,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: const [
                               Text(
-                                "New Year Sale",
+                                "Ưu đãi Năm Mới",
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -558,7 +558,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                "40% off",
+                                "Giảm 40%",
                                 style: TextStyle(
                                   fontSize: 26,
                                   color: Colors.white,
@@ -634,7 +634,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               alignment: Alignment.centerRight,
             ),
             child: const Text(
-              "View all",
+              "Xem tất cả",
               style: TextStyle(
                 fontSize: 13,
                 color: kAccentColor,
@@ -650,7 +650,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   Widget _buildCategoriesSection(BuildContext context) {
     return Column(
       children: [
-        _buildSectionHeader("Categories", () {
+        _buildSectionHeader("Danh mục", () {
           final wrapperState = context
               .findAncestorStateOfType<_MainScreenWrapperState>();
           wrapperState?._onItemTapped(1);
@@ -673,7 +673,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 height: 95,
                 child: Center(
                   child: Text(
-                    "Lỗi tải danh mục: ${provider.errorMessage ?? 'Unknown error'}",
+                    "Lỗi tải danh mục: ${provider.errorMessage ?? 'Lỗi không xác định'}",
                   ),
                 ),
               );
@@ -753,8 +753,8 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   Widget _buildPopularProductsSection(BuildContext context) {
     return Column(
       children: [
-        _buildSectionHeader("Popular Product", () {
-          /* TODO: Navigate */
+        _buildSectionHeader("Sản phẩm nổi bật", () {
+          /* TODO: Điều hướng */
         }),
         Consumer<ProductProvider>(
           builder: (context, provider, child) {
@@ -771,7 +771,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
               return Center(
                 heightFactor: 5,
                 child: Text(
-                  "Lỗi tải sản phẩm: ${provider.errorMessage ?? 'Unknown error'}",
+                  "Lỗi tải sản phẩm: ${provider.errorMessage ?? 'Lỗi không xác định'}",
                 ),
               );
             }
@@ -990,8 +990,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                           ),
                       ],
                     ),
-                    // Spacer để đẩy giá + rating xuống nếu dùng spaceBetween cho Column cha
-                    // const Spacer(), // Bỏ Spacer này nếu không dùng spaceBetween cho Column cha
+                    // const Spacer(), // Bỏ nếu không cần đẩy xuống
                   ],
                 ),
               ),

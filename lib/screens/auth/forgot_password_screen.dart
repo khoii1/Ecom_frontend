@@ -17,30 +17,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
 
+  /// Gửi mã xác thực đặt lại mật khẩu
   Future<void> _sendCode() async {
     setState(() => _isLoading = true);
     final authProvider = context.read<AuthProvider>();
     final error = await authProvider.forgotPassword(_emailController.text);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (error == null) {
-        // Gửi code thành công
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerificationScreen(
-              email: _emailController.text,
-              purpose: VerificationPurpose
-                  .resetPassword, // Mục đích là reset mật khẩu
-            ),
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      // ✅ Gửi thành công → chuyển sang màn hình nhập OTP
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VerificationScreen(
+            email: _emailController.text,
+            purpose: VerificationPurpose.resetPassword,
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-      }
+        ),
+      );
+    } else {
+      // ❌ Thông báo lỗi
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -49,10 +54,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          "Forgot Password",
-          style: TextStyle(color: kTextColor),
-        ),
+        title: const Text("Quên mật khẩu", style: TextStyle(color: kTextColor)),
         backgroundColor: kBackgroundColor,
         elevation: 0,
         leading: const BackButton(color: kTextColor),
@@ -63,7 +65,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Reset Password",
+              "Đặt lại mật khẩu",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -72,19 +74,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Enter the email associated with your account and we'll send an email with a code to reset your password.",
+              "Nhập email bạn đã đăng ký. Chúng tôi sẽ gửi mã xác thực để giúp bạn đặt lại mật khẩu.",
               style: TextStyle(fontSize: 16, color: kSecondaryTextColor),
             ),
             const SizedBox(height: 32),
             CustomTextField(
               controller: _emailController,
-              labelText: "Email",
+              labelText: "Địa chỉ Email",
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 24),
             PrimaryButton(
-              text: "Send Code",
+              text: "Gửi mã xác thực",
               onPressed: _sendCode,
               isLoading: _isLoading,
             ),

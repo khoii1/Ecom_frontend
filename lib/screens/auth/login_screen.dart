@@ -6,6 +6,7 @@ import 'package:ecom_frontend/utils/constants.dart';
 import 'package:ecom_frontend/widgets/custom_text_field.dart';
 import 'package:ecom_frontend/widgets/primary_button.dart';
 import 'package:provider/provider.dart';
+import 'package:ecom_frontend/app_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,47 +16,54 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Đã cập nhật giá trị theo log bạn gửi
   final _emailController = TextEditingController(text: "seller1@tempmail.vn");
   final _passwordController = TextEditingController(text: "admin123");
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  // --- HÀM _login ĐÃ SỬA LỖI RÁCH THỜI GIAN (RACE CONDITION) ---
+  /// Đăng nhập và điều hướng khi thành công
   Future<void> _login() async {
-    // 1. Chỉ bật spinner nếu widget còn tồn tại
     if (!mounted) return;
     setState(() => _isLoading = true);
 
     final authProvider = context.read<AuthProvider>();
-    String? error; // Biến local để lưu lỗi
+    String? error;
 
     try {
-      // 2. Gọi hàm login
       error = await authProvider.login(
-        _emailController.text,
-        _passwordController.text,
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
     } catch (e) {
-      // 3. Bắt lỗi không mong muốn (nếu có)
       error = e.toString();
     } finally {
-      // 4. KHỐI FINALLY: LUÔN CHẠY SAU TRY/CATCH/AWAIT
-      if (mounted) {
-        // Đặt _isLoading về false để giải phóng nút. BẮT BUỘC phải gọi
-        setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-        if (error != null) {
-          // 5. Nếu có lỗi, hiển thị lỗi.
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error!)));
-        }
-        // Nếu thành công (error == null), AuthProvider đã chuyển trạng thái
-        // và AppWrapper sẽ tự động điều hướng.
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error!),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        // Đăng nhập thành công → xoá stack và trở lại AppWrapper
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AppWrapper()),
+          (route) => false,
+        );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -69,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Welcome Back",
+              "Chào mừng trở lại",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -78,20 +86,20 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Please enter your email and password to sign in",
+              "Vui lòng nhập email và mật khẩu để đăng nhập",
               style: TextStyle(fontSize: 16, color: kSecondaryTextColor),
             ),
             const SizedBox(height: 32),
             CustomTextField(
               controller: _emailController,
-              labelText: "Email",
+              labelText: "Địa chỉ Email",
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
             CustomTextField(
               controller: _passwordController,
-              labelText: "Password",
+              labelText: "Mật khẩu",
               prefixIcon: Icons.lock_outline,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
@@ -120,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       activeColor: kPrimaryColor,
                     ),
                     const Text(
-                      "Remember me",
+                      "Ghi nhớ đăng nhập",
                       style: TextStyle(color: kSecondaryTextColor),
                     ),
                   ],
@@ -135,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                   child: const Text(
-                    "Forgot Password?",
+                    "Quên mật khẩu?",
                     style: TextStyle(color: kPrimaryColor),
                   ),
                 ),
@@ -143,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 24),
             PrimaryButton(
-              text: "Login with Email",
+              text: "Đăng nhập bằng Email",
               onPressed: _login,
               isLoading: _isLoading,
             ),
@@ -152,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Don't have an account? ",
+                  "Chưa có tài khoản? ",
                   style: TextStyle(color: kSecondaryTextColor),
                 ),
                 TextButton(
@@ -163,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                   child: const Text(
-                    "Register",
+                    "Đăng ký",
                     style: TextStyle(
                       color: kPrimaryColor,
                       fontWeight: FontWeight.bold,

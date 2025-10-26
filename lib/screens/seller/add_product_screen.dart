@@ -9,8 +9,6 @@ import 'package:ecom_frontend/utils/constants.dart';
 import 'package:ecom_frontend/widgets/primary_button.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-
-// SỬA: Thêm 2 import
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -22,64 +20,64 @@ class AddProductScreen extends StatefulWidget {
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
+  // State form
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   final _discountPercentageController = TextEditingController();
   final _descriptionController = TextEditingController();
 
+  // State dữ liệu
   File? _selectedImage;
-  bool _isLoading = false; // Loading cho nút đăng sản phẩm
+  bool _isLoading = false;
   String? _selectedStoreId;
-  bool _isLoadingStore = true; // Loading khi lấy store ID
+  bool _isLoadingStore = true;
 
   List<Category> _categories = [];
   Category? _selectedCategory;
-  bool _isLoadingCategories = true; // Loading khi lấy danh mục
+  bool _isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _fetchUserStore();
-        _fetchCategories();
-      }
+      if (!mounted) return;
+      _fetchUserStore();
+      _fetchCategories();
     });
   }
 
+  // Tải danh mục
   Future<void> _fetchCategories() async {
-    // ... code giữ nguyên ...
     try {
       if (!mounted) return;
       final categoryService = context.read<CategoryService>();
       _categories = await categoryService.getCategories();
     } catch (e) {
       print("Lỗi lấy danh mục: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi tải danh mục: ${e.toString()}')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi tải danh mục: ${e.toString()}')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingCategories = false);
-      }
+      if (mounted) setState(() => _isLoadingCategories = false);
     }
   }
 
+  // Lấy cửa hàng của tôi
   Future<void> _fetchUserStore() async {
-    // ... code giữ nguyên ...
     try {
       if (!mounted) return;
       final storeService = context.read<StoreService>();
       final myStores = await storeService.getMyStores();
-      if (mounted && myStores.isNotEmpty) {
+      if (!mounted) return;
+
+      if (myStores.isNotEmpty) {
         setState(() {
           _selectedStoreId = myStores.first.id;
           print("Đã tìm thấy Store ID: $_selectedStoreId");
         });
-      } else if (mounted) {
+      } else {
         print("User không có cửa hàng nào.");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -89,62 +87,42 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     } catch (e) {
       print("Lỗi lấy Store ID: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi tải thông tin cửa hàng: ${e.toString()}'),
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi tải thông tin cửa hàng: ${e.toString()}')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingStore = false);
-      }
+      if (mounted) setState(() => _isLoadingStore = false);
     }
   }
 
+  // Chọn ảnh từ thư viện và lưu vào thư mục app (persistent)
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
       if (pickedFile != null) {
-        // --- SỬA: Thay đổi toàn bộ khối này ---
-
-        // 1. Đọc dữ liệu ảnh
         final bytes = await pickedFile.readAsBytes();
-
-        // 2. Lấy thư mục LƯU TRỮ (persistent) của ứng dụng
         final appDir = await getApplicationDocumentsDirectory();
-
-        // 3. Tạo đường dẫn và tên tệp mới
         final fileName =
             'temp_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        // Dùng p.join để ghép đường dẫn an toàn (thay vì dùng /)
         final persistentFile = File(p.join(appDir.path, fileName));
-
-        // 4. Ghi dữ liệu ảnh vào tệp mới
         await persistentFile.writeAsBytes(bytes);
 
-        setState(() {
-          // 5. Lưu tệp mới (tệp này sẽ không bị xóa)
-          _selectedImage = persistentFile;
-        });
-
-        // --- HẾT PHẦN SỬA ---
+        setState(() => _selectedImage = persistentFile);
       }
     } catch (e) {
       print('Lỗi chọn ảnh: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi chọn ảnh: ${e.toString()}')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi chọn ảnh: ${e.toString()}')));
     }
   }
 
+  // Đăng sản phẩm
   Future<void> _addProduct() async {
-    // ... validation giữ nguyên ...
     if (!_formKey.currentState!.validate()) return;
     if (_selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,21 +152,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     String? imageUrl;
     try {
       final productService = context.read<ProductService>();
-      final productProvider = context
-          .read<ProductProvider>(); // <-- LẤY PRODUCT PROVIDER
+      final productProvider = context.read<ProductProvider>();
 
-      // 1. Upload ảnh
+      // Upload ảnh
       try {
-        // Kiểm tra file tồn tại trước khi upload
         if (_selectedImage == null) {
           throw Exception("Chưa chọn ảnh sản phẩm");
         }
-
-        // SỬA: Logic kiểm tra file tồn tại của bạn đã đúng.
-        // Giờ đây nó sẽ luôn tìm thấy file vì chúng ta đã lưu vào
-        // thư mục persistent.
         if (!await _selectedImage!.exists()) {
-          // Lỗi này không nên xảy ra nữa
           throw Exception("File ảnh không tồn tại hoặc đã bị xóa");
         }
 
@@ -197,20 +168,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
           throw Exception("URL ảnh trả về null sau khi upload.");
         }
       } catch (uploadError) {
-        // ... xử lý lỗi upload giữ nguyên ...
         print("Lỗi upload ảnh chi tiết: $uploadError");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi upload ảnh: ${uploadError.toString()}'),
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi upload ảnh: ${uploadError.toString()}')),
+        );
         setState(() => _isLoading = false);
         return;
       }
 
-      // 2. Tạo sản phẩm
+      // Tạo sản phẩm
       await productService.addProduct(
         storeId: _selectedStoreId!,
         title: _nameController.text,
@@ -225,34 +192,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
         imageUrl: imageUrl,
       );
 
-      // --- THÀNH CÔNG ---
-      if (mounted) {
-        // Gọi refresh trên ProductProvider *TRƯỚC* khi pop
-        await productProvider.refreshProducts(); // <-- GỌI REFRESH
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đăng sản phẩm thành công!')),
-        );
-        Navigator.pop(context);
-      }
+      // Thành công -> refresh list rồi pop
+      if (!mounted) return;
+      await productProvider.refreshProducts();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đăng sản phẩm thành công!')),
+      );
+      Navigator.pop(context);
     } catch (e) {
-      // ... xử lý lỗi đăng sản phẩm giữ nguyên ...
       print("Lỗi đăng sản phẩm chi tiết: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi đăng sản phẩm: ${e.toString()}')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi đăng sản phẩm: ${e.toString()}')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // UI
   @override
   Widget build(BuildContext context) {
-    // ... Phần build UI giữ nguyên ...
     return Scaffold(
       appBar: AppBar(
         title: const Text("Đăng sản phẩm mới"),
@@ -354,9 +314,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  // Widget chọn ảnh - giữ nguyên
+  // Chọn ảnh
   Widget _buildImagePicker() {
-    // ... code giữ nguyên ...
     return Center(
       child: GestureDetector(
         onTap: _pickImage,
@@ -383,7 +342,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ],
           ),
           child: _selectedImage == null
-              ? Center(
+              ? const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -392,8 +351,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         size: 50,
                         color: kSecondaryTextColor,
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
+                      SizedBox(height: 12),
+                      Text(
                         "Chọn ảnh sản phẩm",
                         style: TextStyle(
                           color: kSecondaryTextColor,
@@ -409,7 +368,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  // Widget TextFormField chuẩn - giữ nguyên
+  // TextField chuẩn dùng lại
   Widget _buildTextField({
     required TextEditingController controller,
     required String labelText,
@@ -475,9 +434,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  // Widget Dropdown danh mục - giữ nguyên
+  // Dropdown danh mục
   Widget _buildCategoryDropdown() {
-    // ... code giữ nguyên ...
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -560,16 +518,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                 ),
-                items: _categories.map((Category category) {
+                items: _categories.map((category) {
                   return DropdownMenuItem<Category>(
                     value: category,
                     child: Text(category.name, overflow: TextOverflow.ellipsis),
                   );
                 }).toList(),
                 onChanged: (Category? newValue) {
-                  setState(() {
-                    _selectedCategory = newValue;
-                  });
+                  setState(() => _selectedCategory = newValue);
                 },
               ),
       ],

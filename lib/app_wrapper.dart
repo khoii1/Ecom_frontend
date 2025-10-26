@@ -4,10 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
 
-// ... các import khác ...
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/screens/auth/login_screen.dart';
-import 'package:ecom_frontend/screens/home/home_screen.dart'; // Hoặc file chứa MainScreenWrapper
+import 'package:ecom_frontend/screens/home/home_screen.dart';
 import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
 
 class AppWrapper extends StatefulWidget {
@@ -21,11 +20,19 @@ class _AppWrapperState extends State<AppWrapper> {
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   bool _initialLinkHandled = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initDeepLinks();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await _initDeepLinks();
+    setState(() {
+      _isInitialized = true;
+    });
   }
 
   @override
@@ -39,28 +46,21 @@ class _AppWrapperState extends State<AppWrapper> {
       _initialLinkHandled = true;
       try {
         final initialUri = await _appLinks.getInitialLink();
-        if (initialUri != null) {
-          _handleDeepLink(initialUri);
-        }
-      } on PlatformException {
+        if (initialUri != null) _handleDeepLink(initialUri);
+      } on PlatformException catch (_) {
         // ignore
       } on FormatException catch (_) {
         // ignore
       }
     }
+
     _linkSubscription?.cancel();
-    _linkSubscription = _appLinks.uriLinkStream.listen(
-      (uri) {
-        if (!mounted) return;
-        _handleDeepLink(uri);
-      },
-      onError: (err) {
-        // ignore
-      },
-    );
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      if (!mounted) return;
+      _handleDeepLink(uri);
+    }, onError: (err) {});
   }
 
-  /// Hàm xử lý chung cho cả link ban đầu và link đến sau
   void _handleDeepLink(Uri uri) {
     if (!mounted) return;
     if (uri.scheme == 'khoiecomapp' && uri.host == 'payment-result') {
@@ -68,6 +68,7 @@ class _AppWrapperState extends State<AppWrapper> {
       final status = uri.queryParameters['status'];
       final message = uri.queryParameters['message'];
       final vnpResponseCode = uri.queryParameters['vnp_ResponseCode'];
+
       if (orderId != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -100,15 +101,21 @@ class _AppWrapperState extends State<AppWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Phần build giữ nguyên như trước
+    // Nếu app chưa khởi tạo deep links xong
+    if (!_isInitialized) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Lắng nghe thay đổi AuthProvider
     return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
+      builder: (context, authProvider, _) {
         switch (authProvider.authStatus) {
           case AuthStatus.authenticated:
             return const MainScreenWrapper();
           case AuthStatus.unauthenticated:
             return const LoginScreen();
           case AuthStatus.unknown:
+          default:
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );

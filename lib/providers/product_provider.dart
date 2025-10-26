@@ -2,7 +2,7 @@ import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/services/product_service.dart';
 import 'package:flutter/material.dart';
 
-// Enum for loading states
+/// Trạng thái tải sản phẩm
 enum ProductStatus { initial, loading, loaded, error }
 
 class ProductProvider extends ChangeNotifier {
@@ -18,14 +18,15 @@ class ProductProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   ProductProvider(this._productService) {
-    // Tự động fetch sản phẩm lần đầu
+    // Tự động tải danh sách sản phẩm khi khởi tạo
     fetchProducts();
   }
 
+  /// Lấy danh sách sản phẩm từ API
   Future<void> fetchProducts() async {
     _status = ProductStatus.loading;
-    _errorMessage = null; // Reset lỗi cũ
-    notifyListeners(); // Thông báo đang tải
+    _errorMessage = null;
+    notifyListeners();
 
     try {
       _products = await _productService.getProducts();
@@ -34,11 +35,11 @@ class ProductProvider extends ChangeNotifier {
       _errorMessage = e.toString();
       _status = ProductStatus.error;
     } finally {
-      notifyListeners(); // Thông báo đã tải xong hoặc có lỗi
+      notifyListeners();
     }
   }
 
-  // Hàm này sẽ được gọi từ AddProductScreen sau khi đăng thành công
+  /// Làm mới danh sách sản phẩm (dùng khi thêm/xóa/cập nhật)
   Future<void> refreshProducts() async {
     await fetchProducts();
   }

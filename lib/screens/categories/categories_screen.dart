@@ -30,7 +30,8 @@ class CategoriesScreen extends StatelessWidget {
         ),
       );
     }
-    // ... (Phần xử lý lỗi và empty giữ nguyên) ...
+
+    // --- Trạng thái lỗi ---
     if (categoryProvider.status == CategoryStatus.error) {
       return Center(
         child: Padding(
@@ -41,7 +42,7 @@ class CategoriesScreen extends StatelessWidget {
               Icon(Icons.error_outline, color: Colors.red[400], size: 50),
               const SizedBox(height: 16),
               Text(
-                "Lỗi tải danh mục:\n${categoryProvider.errorMessage ?? 'Không rõ nguyên nhân'}",
+                "Lỗi khi tải danh mục:\n${categoryProvider.errorMessage ?? 'Không xác định'}",
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: kSecondaryTextColor),
               ),
@@ -60,12 +61,15 @@ class CategoriesScreen extends StatelessWidget {
         ),
       );
     }
+
+    // --- Trạng thái rỗng ---
     if (categoryProvider.categories.isEmpty) {
-      return const Center(child: Text("Không có danh mục nào."));
+      return const Center(child: Text("Chưa có danh mục nào."));
     }
 
     final categories = categoryProvider.categories;
 
+    // --- Danh sách danh mục ---
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
       itemCount: categories.length,
@@ -79,17 +83,16 @@ class CategoriesScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final category = categories[index];
         return ListTile(
-          // --- THAY ĐỔI: Hiển thị ảnh thay vì Icon ---
+          // Hiển thị ảnh danh mục (fallback icon nếu không có ảnh)
           leading: category.imageUrl != null && category.imageUrl!.isNotEmpty
               ? ClipRRect(
-                  // Bo tròn ảnh
                   borderRadius: BorderRadius.circular(8.0),
                   child: Image.network(
                     category.imageUrl!,
-                    width: 50, // Kích thước ảnh
+                    width: 50,
                     height: 50,
                     fit: BoxFit.cover,
-                    // Hiển thị placeholder khi đang tải hoặc lỗi
+                    // Placeholder khi đang tải
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return Container(
@@ -106,6 +109,7 @@ class CategoriesScreen extends StatelessWidget {
                         ),
                       );
                     },
+                    // Hiển thị icon khi lỗi ảnh
                     errorBuilder: (context, error, stackTrace) => Container(
                       width: 50,
                       height: 50,
@@ -118,7 +122,6 @@ class CategoriesScreen extends StatelessWidget {
                   ),
                 )
               : Container(
-                  // Placeholder nếu không có ảnh
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
@@ -127,7 +130,6 @@ class CategoriesScreen extends StatelessWidget {
                   ),
                   child: Icon(Icons.category_outlined, color: Colors.grey[400]),
                 ),
-          // --- KẾT THÚC THAY ĐỔI ---
           title: Text(
             category.name,
             style: const TextStyle(
@@ -143,18 +145,6 @@ class CategoriesScreen extends StatelessWidget {
           ),
           onTap: () {
             print("Đã chọn danh mục: ${category.name} (ID: ${category.id})");
-            // Ví dụ điều hướng:
-            /*
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductsByCategoryScreen(
-                  categoryName: category.name,
-                  categoryId: category.id,
-                ),
-              ),
-            );
-            */
           },
           splashColor: kPrimaryColor.withOpacity(0.1),
         );

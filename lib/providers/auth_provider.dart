@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:ecom_frontend/services/auth_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
 
+/// Trạng thái xác thực người dùng
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
@@ -21,11 +22,15 @@ class AuthProvider extends ChangeNotifier {
   User? get currentUser => _currentUser;
 
   AuthProvider(this._authService, this._storageService, this._userService) {
-    _checkAuthStatus();
+    _init();
+  }
+
+  /// ===== Khởi tạo và kiểm tra trạng thái đăng nhập =====
+  Future<void> _init() async {
+    await _checkAuthStatus();
   }
 
   Future<void> _checkAuthStatus() async {
-    // Chỉ cần kiểm tra access_token
     final token = await _storageService.readToken('access_token');
     if (token != null) {
       _accessToken = token;
@@ -33,7 +38,7 @@ class AuthProvider extends ChangeNotifier {
         _currentUser = await _userService.getMyProfile();
         _authStatus = AuthStatus.authenticated;
       } catch (e) {
-        await logout(); // Xóa token cũ nếu không hợp lệ
+        await logout();
         _authStatus = AuthStatus.unauthenticated;
       }
     } else {
@@ -42,56 +47,34 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ===== Đăng nhập =====
   Future<String?> login(String email, String password) async {
     try {
-      print('Attempting login with Email: "$email", Password: "$password"');
-      // 1. GỌI API LOGIN
       final responseData = await _authService.login(email, password);
-
       final accessToken = responseData['access_token'];
 
       if (accessToken is String) {
         _accessToken = accessToken;
         await _storageService.saveToken('access_token', accessToken);
 
-        // 2. THỬ LẤY PROFILE ĐỂ XÁC NHẬN TOKEN HỢP LỆ
-        try {
-          _currentUser = await _userService.getMyProfile();
-          _authStatus = AuthStatus.authenticated;
-          notifyListeners();
-          return null; // Đăng nhập thành công
-        } catch (e) {
-          // LỖI LẤY PROFILE: Xóa token và báo lỗi
-          print('Lỗi khi lấy profile sau đăng nhập: $e');
-          _authStatus = AuthStatus.unauthenticated;
-          _currentUser = null;
-          await _storageService.deleteAllTokens();
-          notifyListeners();
-          // Bắt lỗi 403 (Forbidden) ở đây nếu tài khoản chưa kích hoạt
-          if (e.toString().contains('403')) {
-            return 'Đăng nhập thành công, nhưng tài khoản chưa kích hoạt.';
-          }
-          return 'Đã đăng nhập nhưng không thể xác minh tài khoản (Token/Profile Error).';
-        }
+        _currentUser = await _userService.getMyProfile();
+        _authStatus = AuthStatus.authenticated;
+        notifyListeners();
+        return null;
       } else {
         throw Exception("API không trả về access_token hợp lệ.");
       }
     } catch (e) {
-      // XỬ LÝ LỖI GỌI API LOGIN
       _authStatus = AuthStatus.unauthenticated;
       _currentUser = null;
       await _storageService.deleteAllTokens();
       notifyListeners();
-      if (e.toString().contains('Sai thông tin đăng nhập')) {
-        //
-        return 'Sai thông tin đăng nhập hoặc tài khoản chưa kích hoạt.'; //
-      }
       return e.toString();
     }
   }
 
+  /// ===== Đăng xuất =====
   Future<void> logout() async {
-    // Chỉ cần xóa access_token (hoặc xóa hết cho chắc)
     await _storageService.deleteAllTokens();
     _accessToken = null;
     _currentUser = null;
@@ -99,7 +82,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Các hàm khác giữ nguyên ---
+  /// ===== Đăng ký tài khoản mới =====
   Future<String?> register({
     required String fullName,
     required String email,
@@ -113,30 +96,52 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         role: role,
       );
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
       return null;
     } catch (e) {
       return e.toString();
     }
   }
 
+  /// ===== Xác thực email sau khi đăng ký =====
   Future<String?> verifyEmail(String email, String code) async {
     try {
       await _authService.verifyEmail(email, code);
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
       return null;
     } catch (e) {
       return e.toString();
     }
   }
 
+  /// ===== Quên mật khẩu (gửi mã OTP về email) =====
   Future<String?> forgotPassword(String email) async {
     try {
       await _authService.forgotPassword(email);
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
       return null;
     } catch (e) {
       return e.toString();
     }
   }
 
+  /// ===== Kiểm tra mã OTP đặt lại mật khẩu =====
+  Future<String?> verifyResetCode(String email, String code) async {
+    try {
+      await _authService.verifyResetCode(email, code);
+      // Không thay đổi trạng thái, vì người dùng chưa đăng nhập lại
+      return null;
+    } catch (e) {
+      return e.toString().contains("400") || e.toString().contains("Mã")
+          ? "Mã xác thực không đúng hoặc đã hết hạn."
+          : e.toString();
+    }
+  }
+
+  /// ===== Đặt lại mật khẩu mới =====
   Future<String?> resetPassword({
     required String email,
     required String code,
@@ -148,6 +153,8 @@ class AuthProvider extends ChangeNotifier {
         code: code,
         newPassword: newPassword,
       );
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
       return null;
     } catch (e) {
       return e.toString();

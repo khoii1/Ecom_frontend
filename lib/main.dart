@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:ecom_frontend/app_wrapper.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/providers/cart_provider.dart';
-// import 'package:ecom_frontend/services/api_client.dart'; // Bỏ
+// import 'package:ecom_frontend/services/api_client.dart';
 import 'package:ecom_frontend/services/auth_service.dart';
 import 'package:ecom_frontend/services/cart_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
@@ -18,10 +18,7 @@ import 'package:provider/provider.dart';
 import 'package:ecom_frontend/screens/cart/cart_screen.dart';
 import 'package:ecom_frontend/services/vnpay_service.dart';
 import 'package:ecom_frontend/screens/payment/vnpay_webview_screen.dart';
-// --- THÊM IMPORT OrderService ---
 import 'package:ecom_frontend/services/order_service.dart';
-// --- KẾT THÚC THÊM ---
-// <<< THÊM IMPORT PaymentResultScreen >>>
 import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
 
 void main() async {
@@ -29,16 +26,15 @@ void main() async {
   runApp(const MyApp());
 }
 
-// Chuyển sang StatefulWidget để khởi tạo service 1 lần
+// App thành Stateful để khởi tạo service một lần
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  // Khai báo các service và Dio làm biến instance
+  // Khai báo service + Dio
   late final StorageService _storageService;
   late final Dio _dio;
   late final AuthService _authService;
@@ -53,23 +49,17 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Khởi tạo tất cả service và Dio MỘT LẦN trong initState
-    // Khởi tạo Dio trước
-    _dio = Dio(
-      // SỬA: Lấy baseUrl từ AppConfig để dễ thay đổi
-      // BaseOptions(baseUrl: AppConfig.baseUrl),
-      BaseOptions(
-        baseUrl: 'http://10.0.2.2:8080',
-      ), // Tạm giữ cho Android Emulator
-    );
+
+    // Khởi tạo Dio (tạm dùng baseUrl cho Android Emulator)
+    _dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:8080'));
 
     _storageService = StorageService();
 
-    // Cấu hình Interceptor
+    // Interceptor: gắn token & log lỗi
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          String? token = await _storageService.readToken('access_token');
+          final token = await _storageService.readToken('access_token');
           if (token != null && token.isNotEmpty) {
             print("Attaching token to request...");
             options.headers['Authorization'] = 'Bearer $token';
@@ -87,30 +77,29 @@ class _MyAppState extends State<MyApp> {
           }
           if (e.response?.statusCode == 401) {
             print("Unauthorized request - need to handle logout");
-            // TODO: Cần cơ chế global để gọi logout từ AuthProvider
-            // Ví dụ: Dùng GlobalKey<NavigatorState> hoặc EventBus/Stream
+            // TODO: cơ chế global để gọi logout từ AuthProvider nếu cần
           }
           return handler.next(e);
         },
       ),
     );
 
-    // Khởi tạo các service với Dio đã cấu hình
+    // Khởi tạo service với Dio đã cấu hình
     _authService = AuthService(_dio);
     _cartService = CartService(_dio);
     _userService = UserService(_dio);
     _categoryService = CategoryService(_dio);
     _storeService = StoreService(_dio);
     _productService = ProductService(_dio);
-    _orderService = OrderService(_dio); // Đã có OrderService
-    _vnpayService = VnpayService(_dio); // Đã có VnpayService
+    _orderService = OrderService(_dio);
+    _vnpayService = VnpayService(_dio);
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
+      // Cấp phát services và providers
       providers: [
-        // Cung cấp Services đã khởi tạo trong initState
         Provider(create: (_) => _storageService),
         Provider(create: (_) => _authService),
         Provider(create: (_) => _cartService),
@@ -118,28 +107,18 @@ class _MyAppState extends State<MyApp> {
         Provider(create: (_) => _categoryService),
         Provider(create: (_) => _storeService),
         Provider(create: (_) => _productService),
-        Provider(
-          create: (_) => _orderService,
-        ), // Đảm bảo OrderService được cung cấp
-        Provider(
-          create: (_) => _vnpayService,
-        ), // Đảm bảo VnpayService được cung cấp
-        // --- Providers (State Management) ---
+        Provider(create: (_) => _orderService),
+        Provider(create: (_) => _vnpayService),
+
+        // State management
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(
-            _authService,
-            _storageService,
-            _userService,
-          ), // Tự gọi _checkAuthStatus
-        ),
-        // CartProvider phụ thuộc vào AuthProvider
-        ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
           create: (_) =>
-              CartProvider(_cartService, null), // Ban đầu auth có thể null
-          update: (_, authProvider, previousCartProvider) => CartProvider(
-            _cartService,
-            authProvider,
-          ), // Cập nhật khi auth thay đổi
+              AuthProvider(_authService, _storageService, _userService),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
+          create: (_) => CartProvider(_cartService, null),
+          update: (_, authProvider, __) =>
+              CartProvider(_cartService, authProvider),
         ),
         ChangeNotifierProvider(
           create: (_) => ProductProvider(_productService)..fetchProducts(),
@@ -213,6 +192,7 @@ class _MyAppState extends State<MyApp> {
           ).copyWith(background: kBackgroundColor),
           useMaterial3: true,
         ),
+        // Định nghĩa routes chính
         routes: {
           '/cart': (context) => CartScreen(),
           PaymentResultScreen.routeName: (context) {
@@ -226,21 +206,16 @@ class _MyAppState extends State<MyApp> {
               vnpResponseCode: args?['vnpResponseCode'],
             );
           },
-          // <<< THÊM ROUTE CHO WEBVIEW >>>
           VnpayWebViewScreen.routeName: (context) {
             final args =
                 ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
             return VnpayWebViewScreen(
-              paymentUrl:
-                  args?['paymentUrl'] ?? 'about:blank', // Cung cấp URL mặc định
-              // orderId: args?['orderId'] ?? 'N/A', // Truyền orderId nếu cần
+              paymentUrl: args?['paymentUrl'] ?? 'about:blank',
             );
           },
         },
-        // Màn hình khởi đầu
-        home: const AppWrapper(),
-        // <<< CẬP NHẬT routes >>>
+        home: const AppWrapper(), // Màn hình khởi đầu
       ),
     );
   }
