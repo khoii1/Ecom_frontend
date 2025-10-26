@@ -270,7 +270,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
     symbol: 'đ',
-    decimalDigits: 0, // Bỏ phần thập phân
+    decimalDigits: 0,
   );
 
   // ===== Helper hiển thị ảnh từ URL thường hoặc data URL base64 =====
@@ -302,7 +302,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
           fit: fit,
           width: width,
           height: height,
-          gaplessPlayback: true, // tránh flash khi rebuild
+          gaplessPlayback: true,
           errorBuilder: (c, e, s) => ph,
         );
       } catch (_) {
@@ -315,15 +315,14 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       fit: fit,
       width: width,
       height: height,
-      gaplessPlayback: true, // tránh flash khi rebuild
+      gaplessPlayback: true,
       errorBuilder: (c, e, s) => ph,
       loadingBuilder: (c, child, progress) {
         if (progress == null) return child;
-        return const SizedBox.shrink(); // Tạm ẩn loading để tránh nháy
+        return const SizedBox.shrink();
       },
     );
   }
-  // =================================================================
 
   @override
   void initState() {
@@ -340,7 +339,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   AppBar _buildAppBar(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
     return AppBar(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: kPrimaryColor,
       elevation: 0,
       leadingWidth: 0,
       titleSpacing: kDefaultPadding,
@@ -390,7 +389,12 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             IconButton(
               icon: Icon(
                 Icons.shopping_bag_outlined,
-                color: kTextColor.withOpacity(0.7),
+                color: const Color.fromARGB(
+                  255,
+                  253,
+                  253,
+                  253,
+                ).withOpacity(0.7),
               ),
               onPressed: () {
                 Navigator.push(
@@ -434,7 +438,12 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             IconButton(
               icon: Icon(
                 Icons.notifications_none_outlined,
-                color: kTextColor.withOpacity(0.7),
+                color: const Color.fromARGB(
+                  255,
+                  255,
+                  255,
+                  255,
+                ).withOpacity(0.7),
               ),
               onPressed: () {
                 /* TODO: Notifications */
@@ -1011,6 +1020,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         backgroundColor: Colors.white,
         child: ListView(
           children: [
+            SizedBox(height: kDefaultPadding * 2),
             _buildBannerCarousel(context),
             const SizedBox(height: kDefaultPadding / 2),
             _buildCategoriesSection(context),

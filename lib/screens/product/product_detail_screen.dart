@@ -166,15 +166,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  void _buyNow() {
+  void _buyNow() async {
+    // <<< Thêm async
     // Kiểm tra mounted trước khi truy cập context
     if (!mounted) return;
     if (_product != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Mua ngay: "${_product!.title}"')));
-      print('Mua ngay: ${_product!.id}');
-      // Điều hướng đến trang thanh toán
+      final cartProvider = context.read<CartProvider>();
+      try {
+        // 1. Thêm sản phẩm vào giỏ hàng (giống logic của _addToCart)
+        await cartProvider.addToCart(_product!.id); // <<< Thêm await
+
+        // 2. Kiểm tra mounted lần nữa trước khi điều hướng
+        if (mounted) {
+          // 3. Điều hướng đến màn hình giỏ hàng
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  CartScreen(), // Bỏ const nếu CartScreen không phải const
+            ),
+          );
+        }
+      } catch (e) {
+        // Xử lý lỗi nếu thêm vào giỏ hàng thất bại
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi khi thêm vào giỏ: ${e.toString()}'),
+              backgroundColor: kHeartColor, // Màu báo lỗi
+            ),
+          );
+        }
+      }
     }
   }
 

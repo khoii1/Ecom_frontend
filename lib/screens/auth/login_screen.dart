@@ -15,49 +15,54 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Đã cập nhật giá trị theo log bạn gửi
   final _emailController = TextEditingController(text: "seller1@tempmail.vn");
   final _passwordController = TextEditingController(text: "admin123");
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  // --- HÀM ĐÃ ĐƯỢC CẬP NHẬT ĐỂ SỬA LỖI KHỰNG APP ---
+  // --- HÀM _login ĐÃ SỬA LỖI RÁCH THỜI GIAN (RACE CONDITION) ---
   Future<void> _login() async {
+    // 1. Chỉ bật spinner nếu widget còn tồn tại
+    if (!mounted) return;
     setState(() => _isLoading = true);
+
     final authProvider = context.read<AuthProvider>();
+    String? error; // Biến local để lưu lỗi
 
-    final error = await authProvider.login(
-      _emailController.text,
-      _passwordController.text,
-    );
-
- 
-    if (error != null) {
+    try {
+      // 2. Gọi hàm login
+      error = await authProvider.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+    } catch (e) {
+      // 3. Bắt lỗi không mong muốn (nếu có)
+      error = e.toString();
+    } finally {
+      // 4. KHỐI FINALLY: LUÔN CHẠY SAU TRY/CATCH/AWAIT
       if (mounted) {
+        // Đặt _isLoading về false để giải phóng nút. BẮT BUỘC phải gọi
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
+
+        if (error != null) {
+          // 5. Nếu có lỗi, hiển thị lỗi.
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error!)));
+        }
+        // Nếu thành công (error == null), AuthProvider đã chuyển trạng thái
+        // và AppWrapper sẽ tự động điều hướng.
       }
     }
- 
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: kBackgroundColor,
-        elevation: 0,
-        leading: const BackButton(color: kTextColor),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: kTextColor),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: AppBar(backgroundColor: kBackgroundColor, elevation: 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(kDefaultPadding * 1.5),
         child: Column(
@@ -143,7 +148,6 @@ class _LoginScreenState extends State<LoginScreen> {
               isLoading: _isLoading,
             ),
             const SizedBox(height: 32),
-            // ... (Phần Social Login và link Đăng ký) ...
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

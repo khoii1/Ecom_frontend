@@ -256,7 +256,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Đăng sản phẩm mới"),
-        backgroundColor: Colors.white,
+        backgroundColor: kPrimaryColor,
         foregroundColor: kTextColor,
         elevation: 1,
         shadowColor: Colors.black.withOpacity(0.1),

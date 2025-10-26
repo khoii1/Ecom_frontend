@@ -59,17 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: kBackgroundColor,
-        elevation: 0,
-        leading: const BackButton(color: kTextColor),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: kTextColor),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      appBar: AppBar(backgroundColor: kBackgroundColor, elevation: 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(kDefaultPadding * 1.5),
         child: Column(

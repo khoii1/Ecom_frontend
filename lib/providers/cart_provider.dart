@@ -58,9 +58,8 @@ class CartProvider extends ChangeNotifier {
     }
 
     _status = CartStatus.loading;
-    _errorMessage = null; // Xóa lỗi cũ
-    // Gọi notifyListeners ngay lập tức để UI biết đang loading
-    // Không cần addPostFrameCallback ở đây vì nó ở đầu hàm async
+    _errorMessage = null;
+
     notifyListeners();
 
     try {

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ecom_frontend/services/order_service.dart';
 import 'package:ecom_frontend/utils/constants.dart';
-// Optional: Import CartProvider nếu bạn muốn refresh giỏ hàng ở đây
-// import 'package:ecom_frontend/providers/cart_provider.dart';
+import 'package:ecom_frontend/providers/cart_provider.dart';
 
 class PaymentResultScreen extends StatefulWidget {
   // Định nghĩa routeName để dễ dàng điều hướng
@@ -66,11 +65,10 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
           );
         });
 
-        // Optional: Nếu thanh toán thành công ('paid'), có thể fetch lại giỏ hàng
-        // để đảm bảo nó trống (mặc dù backend nên đã xóa)
-        // if (_finalOrderStatus == 'paid' && context.mounted) {
-        //   context.read<CartProvider>().fetchCart(force: true);
-        // }
+        if (_finalOrderStatus == 'paid' && context.mounted) {
+          print("Payment successful, refreshing cart state...");
+          context.read<CartProvider>().fetchCart(force: true);
+        }
       }
     } catch (e) {
       print("PaymentResultScreen: Error checking order status: $e");

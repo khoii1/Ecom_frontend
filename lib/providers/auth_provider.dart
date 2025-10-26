@@ -45,35 +45,46 @@ class AuthProvider extends ChangeNotifier {
   Future<String?> login(String email, String password) async {
     try {
       print('Attempting login with Email: "$email", Password: "$password"');
-      // API response chỉ chứa access_token
+      // 1. GỌI API LOGIN
       final responseData = await _authService.login(email, password);
 
       final accessToken = responseData['access_token'];
 
-      // Chỉ kiểm tra access_token
       if (accessToken is String) {
         _accessToken = accessToken;
-
-        // Chỉ lưu access_token
         await _storageService.saveToken('access_token', accessToken);
 
-        // await _storageService.saveToken('refresh_token', refreshToken);
-
-        _currentUser = await _userService.getMyProfile();
-        _authStatus = AuthStatus.authenticated;
-        notifyListeners();
-        return null; // Đăng nhập thành công
+        // 2. THỬ LẤY PROFILE ĐỂ XÁC NHẬN TOKEN HỢP LỆ
+        try {
+          _currentUser = await _userService.getMyProfile();
+          _authStatus = AuthStatus.authenticated;
+          notifyListeners();
+          return null; // Đăng nhập thành công
+        } catch (e) {
+          // LỖI LẤY PROFILE: Xóa token và báo lỗi
+          print('Lỗi khi lấy profile sau đăng nhập: $e');
+          _authStatus = AuthStatus.unauthenticated;
+          _currentUser = null;
+          await _storageService.deleteAllTokens();
+          notifyListeners();
+          // Bắt lỗi 403 (Forbidden) ở đây nếu tài khoản chưa kích hoạt
+          if (e.toString().contains('403')) {
+            return 'Đăng nhập thành công, nhưng tài khoản chưa kích hoạt.';
+          }
+          return 'Đã đăng nhập nhưng không thể xác minh tài khoản (Token/Profile Error).';
+        }
       } else {
-        // Nếu API không trả về access_token như mong đợi
         throw Exception("API không trả về access_token hợp lệ.");
       }
     } catch (e) {
+      // XỬ LÝ LỖI GỌI API LOGIN
       _authStatus = AuthStatus.unauthenticated;
       _currentUser = null;
-      await _storageService.deleteAllTokens(); // Xóa hết token khi có lỗi
+      await _storageService.deleteAllTokens();
       notifyListeners();
-      if (e is Exception && e.toString().contains('Sai thông tin đăng nhập')) {
-        return 'Sai thông tin đăng nhập hoặc tài khoản chưa kích hoạt.';
+      if (e.toString().contains('Sai thông tin đăng nhập')) {
+        //
+        return 'Sai thông tin đăng nhập hoặc tài khoản chưa kích hoạt.'; //
       }
       return e.toString();
     }

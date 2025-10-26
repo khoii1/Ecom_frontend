@@ -16,7 +16,7 @@ class CartScreen extends StatelessWidget {
 
   final NumberFormat currencyFormatter = NumberFormat.currency(
     locale: 'vi_VN',
-    symbol: '₫',
+    symbol: 'đ',
     decimalDigits: 0,
   );
 

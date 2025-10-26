@@ -79,7 +79,7 @@ class _SearchScreenState extends State<SearchScreen> {
   // --- AppBar Tùy chỉnh với Search Bar ---
   AppBar _buildSearchBar(BuildContext context) {
     return AppBar(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: kPrimaryColor,
       elevation: 1, // Shadow nhẹ
       shadowColor: Colors.black.withOpacity(0.1),
       automaticallyImplyLeading: false, // Ẩn nút back
