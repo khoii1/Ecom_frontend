@@ -44,6 +44,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> login(String email, String password) async {
     try {
+      print('Attempting login with Email: "$email", Password: "$password"');
       // API response chỉ chứa access_token
       final responseData = await _authService.login(email, password);
 
@@ -55,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
 
         // Chỉ lưu access_token
         await _storageService.saveToken('access_token', accessToken);
-        // Không lưu refresh_token nữa
+
         // await _storageService.saveToken('refresh_token', refreshToken);
 
         _currentUser = await _userService.getMyProfile();

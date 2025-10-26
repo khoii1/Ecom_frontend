@@ -4,10 +4,12 @@ import 'package:ecom_frontend/providers/cart_provider.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:ecom_frontend/services/stripe_service.dart';
 // <<< THÊM IMPORT OrderService và Order >>>
 import 'package:ecom_frontend/services/order_service.dart';
 import 'package:ecom_frontend/models/order.dart';
+// <<< THÊM IMPORT VnpayService >>>
+import 'package:ecom_frontend/services/vnpay_service.dart';
+import 'package:ecom_frontend/screens/payment/vnpay_webview_screen.dart';
 
 class CartScreen extends StatelessWidget {
   CartScreen({super.key});
@@ -25,19 +27,13 @@ class CartScreen extends StatelessWidget {
       builder: (context, cartProvider, child) {
         return Scaffold(
           appBar: AppBar(
-            // backgroundColor: kPrimaryColor, // AppBar đã có màu nâu từ theme
-            // foregroundColor: Colors.white,
-            leading: const BackButton(
-              /*color: Colors.white*/
-            ), // Màu icon lấy từ theme
+            leading: const BackButton(),
             title: const Text("Giỏ hàng của tôi"),
             actions: [
               if (cartProvider.cart != null &&
                   cartProvider.cart!.items.isNotEmpty)
                 IconButton(
-                  icon: const Icon(
-                    Icons.delete_sweep_outlined /*, color: Colors.white*/,
-                  ),
+                  icon: const Icon(Icons.delete_sweep_outlined),
                   tooltip: "Xóa tất cả",
                   onPressed: () => _confirmClearCart(context, cartProvider),
                 ),
@@ -55,12 +51,10 @@ class CartScreen extends StatelessWidget {
     BuildContext context,
     CartProvider cartProvider,
   ) async {
-    // Sử dụng context.mounted để kiểm tra an toàn hơn
     if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Dùng dialogContext riêng
         return AlertDialog(
           title: const Text('Xác nhận xóa'),
           content: const Text(
@@ -81,11 +75,9 @@ class CartScreen extends StatelessWidget {
       },
     );
 
-    // Kiểm tra mounted sau await
     if (confirmed == true && context.mounted) {
       try {
         await cartProvider.clearCart();
-        // Kiểm tra mounted lần nữa trước khi dùng context
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -108,7 +100,6 @@ class CartScreen extends StatelessWidget {
   }
 
   Widget _buildBody(BuildContext context, CartProvider cartProvider) {
-    // Kiểm tra trạng thái từ CartProvider
     if (cartProvider.status == CartStatus.loading &&
         cartProvider.cart == null) {
       return const Center(
@@ -148,7 +139,6 @@ class CartScreen extends StatelessWidget {
       );
     }
 
-    // Nếu không loading, không lỗi, nhưng giỏ hàng trống
     if (cartProvider.cart == null || cartProvider.cart!.items.isEmpty) {
       return Center(
         child: Column(
@@ -183,7 +173,6 @@ class CartScreen extends StatelessWidget {
       );
     }
 
-    // Nếu có giỏ hàng
     final cart = cartProvider.cart!;
 
     return RefreshIndicator(
@@ -192,7 +181,6 @@ class CartScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(kDefaultPadding),
         children: [
-          // Hiển thị danh sách sản phẩm
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -205,11 +193,9 @@ class CartScreen extends StatelessWidget {
               height: kDefaultPadding * 1.5,
               thickness: 1,
               color: kOffWhiteColor,
-            ), // Màu divider nhạt hơn
+            ),
           ),
           const SizedBox(height: kDefaultPadding * 1.5),
-
-          // Phần Promo Code
           const Text(
             "Mã giảm giá",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -231,36 +217,27 @@ class CartScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: kDefaultPadding * 2), // Khoảng trống cuối
+          const SizedBox(height: kDefaultPadding * 2),
         ],
       ),
     );
   }
 
-  // Widget hiển thị một item trong giỏ hàng
   Widget _buildCartItem(
     BuildContext context,
     CartItem item,
     CartProvider cartProvider,
   ) {
     return Dismissible(
-      key: ValueKey(item.id), // Key quan trọng cho Dismissible
+      key: ValueKey(item.id),
       direction: DismissDirection.endToStart,
       onDismissed: (direction) async {
-        // Thêm async
         try {
           await cartProvider.removeFromCart(item.id);
-          // Kiểm tra mounted trước khi dùng context
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Đã xóa "${item.title}"'),
-                // action: SnackBarAction( // Tạm bỏ Hoàn tác cho đơn giản
-                //    label: "Hoàn tác",
-                //    onPressed: () => cartProvider.fetchCart(force: true),
-                // ),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Đã xóa "${item.title}"')));
           }
         } catch (e) {
           if (context.mounted) {
@@ -284,7 +261,6 @@ class CartScreen extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Ảnh Sản Phẩm ---
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Container(
@@ -318,7 +294,6 @@ class CartScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // --- Thông tin Sản Phẩm ---
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,15 +308,12 @@ class CartScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // Hiển thị giá cuối (finalPrice) nếu có, kèm giá gốc gạch ngang
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        currencyFormatter.format(
-                          item.finalPrice ?? item.price,
-                        ), // Ưu tiên giá cuối
+                        currencyFormatter.format(item.finalPrice ?? item.price),
                         style: const TextStyle(
                           color: kPrimaryColor,
                           fontWeight: FontWeight.bold,
@@ -367,7 +339,6 @@ class CartScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // --- Nút tăng giảm số lượng ---
             _buildQuantityButtons(context, item, cartProvider),
           ],
         ),
@@ -375,16 +346,14 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // Widget nút tăng giảm số lượng
   Widget _buildQuantityButtons(
     BuildContext context,
     CartItem item,
     CartProvider cartProvider,
   ) {
-    bool isUpdating = false; // State tạm để disable nút khi đang gọi API
+    bool isUpdating = false;
 
     return StatefulBuilder(
-      // Dùng StatefulBuilder để quản lý isUpdating
       builder: (context, setQtyState) {
         return Container(
           decoration: BoxDecoration(
@@ -395,7 +364,6 @@ class CartScreen extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Nút giảm
               SizedBox(
                 width: 36,
                 height: 36,
@@ -408,20 +376,15 @@ class CartScreen extends StatelessWidget {
                         : kSecondaryTextColor.withOpacity(0.5),
                     size: 18,
                   ),
-                  // Disable nút khi đang loading hoặc qty <= 0
                   onPressed: (isUpdating || item.qty <= 0)
                       ? null
                       : () async {
-                          setQtyState(
-                            () => isUpdating = true,
-                          ); // Bắt đầu loading
+                          setQtyState(() => isUpdating = true);
                           try {
-                            // Gọi API cập nhật (Backend tự xử lý xóa nếu qty-1 <= 0)
                             await cartProvider.updateItemQuantity(
                               item.id,
                               item.qty - 1,
                             );
-                            // Fetch lại cart sẽ tự cập nhật UI
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -432,14 +395,13 @@ class CartScreen extends StatelessWidget {
                               );
                             }
                           } finally {
-                            // Đảm bảo dừng loading
-                            if (context.mounted)
+                            if (context.mounted) {
                               setQtyState(() => isUpdating = false);
+                            }
                           }
                         },
                 ),
               ),
-              // Số lượng
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: isUpdating
@@ -457,7 +419,6 @@ class CartScreen extends StatelessWidget {
                         ),
                       ),
               ),
-              // Nút tăng
               SizedBox(
                 width: 36,
                 height: 36,
@@ -473,9 +434,7 @@ class CartScreen extends StatelessWidget {
                   onPressed: isUpdating
                       ? null
                       : () async {
-                          setQtyState(
-                            () => isUpdating = true,
-                          ); // Bắt đầu loading
+                          setQtyState(() => isUpdating = true);
                           try {
                             await cartProvider.updateItemQuantity(
                               item.id,
@@ -491,8 +450,9 @@ class CartScreen extends StatelessWidget {
                               );
                             }
                           } finally {
-                            if (context.mounted)
+                            if (context.mounted) {
                               setQtyState(() => isUpdating = false);
+                            }
                           }
                         },
                 ),
@@ -504,17 +464,11 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // Widget thanh bottom bar tính tổng và nút checkout
   Widget _buildBottomBar(BuildContext context, CartProvider cartProvider) {
     final bool isEmpty =
         cartProvider.cart == null || cartProvider.cart!.items.isEmpty;
-    // Lấy subtotal đã tính từ backend
     final double subtotal = isEmpty ? 0.0 : cartProvider.cart!.subtotal;
-    // --- QUAN TRỌNG: Logic lấy/tạo Order ID ---
-    String? orderIdForPayment; // Sẽ lấy ID sau khi tạo Order thành công
-    // -----------------------------------------
-
-    // State tạm để quản lý loading cho nút checkout
+    String? orderIdForPayment;
     bool _isCheckingOut = false;
 
     return Container(
@@ -556,139 +510,76 @@ class CartScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: kDefaultPadding),
-          // Sử dụng StatefulBuilder để quản lý trạng thái loading của nút
           StatefulBuilder(
             builder: (context, setCheckoutState) {
               return SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed:
-                      (isEmpty ||
-                          _isCheckingOut) // Disable nếu rỗng hoặc đang checkout
+                  onPressed: (isEmpty || _isCheckingOut)
                       ? null
                       : () async {
-                          // --- Logic gọi thanh toán Stripe ---
-                          setCheckoutState(
-                            () => _isCheckingOut = true,
-                          ); // Bắt đầu loading nút
-
-                          final stripeService = context.read<StripeService>();
+                          // --- Bắt đầu logic thanh toán VNPay ---
+                          setCheckoutState(() => _isCheckingOut = true);
+                          Order? newOrder; // Khai báo newOrder ở đây
                           final cartProv = context
-                              .read<CartProvider>(); // Không listen
-                          final orderService = context
-                              .read<OrderService>(); // Lấy OrderService
+                              .read<CartProvider>(); // Thêm dòng này
 
-                          // 1. (QUAN TRỌNG) Tạo Order trên Backend trước khi thanh toán
-                          print("--- Start Payment Process ---");
-                          print("Step 1: Creating Order from Cart...");
-                          Order? newOrder;
                           try {
-                            // Gọi API backend (POST /orders)
+                            // 1. Tạo Order trên Backend trước khi thanh toán
+                            print("--- Start Payment Process ---");
+                            print("Step 1: Creating Order from Cart...");
+                            final orderService = context.read<OrderService>();
                             newOrder = await orderService.createOrderFromCart();
-                            orderIdForPayment = newOrder!.id; // Lấy ID thật
+                            orderIdForPayment = newOrder.id;
                             print(
-                              "Order created successfully: ID = $orderIdForPayment, Total = ${newOrder!.total}",
+                              "Order created successfully: ID = $orderIdForPayment, Total = ${newOrder.total}",
                             );
-                          } catch (e) {
-                            print("Error creating order: $e");
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    "Lỗi tạo đơn hàng: ${e.toString()}",
-                                  ),
-                                  backgroundColor: kHeartColor,
-                                ),
-                              );
+
+                            if (orderIdForPayment == null || newOrder == null) {
+                              throw Exception("Không thể tạo mã đơn hàng.");
                             }
-                            setCheckoutState(
-                              () => _isCheckingOut = false,
-                            ); // Dừng loading
-                            return; // Dừng nếu không tạo được order
-                          }
-                          // --- KẾT THÚC Tạo Order ---
 
-                          // 2. Kiểm tra lại orderIdForPayment
-                          if (orderIdForPayment == null || newOrder == null) {
+                            // --- Logic gọi VNPay ---
+                            final vnpayService = context.read<VnpayService>();
+                            // 2. Lấy URL thanh toán từ backend
                             print(
-                              "Error: Order ID or Order object is null after creation.",
+                              "Step 2: Getting VNPay URL for Order ID $orderIdForPayment, Amount ${newOrder.total}",
                             );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Không thể tạo mã đơn hàng."),
-                                  backgroundColor: kHeartColor,
-                                ),
-                              );
-                            }
-                            setCheckoutState(() => _isCheckingOut = false);
-                            return;
-                          }
-
-                          // 3. Gọi Stripe Payment Sheet
-                          try {
-                            print(
-                              "Step 2: Presenting Stripe Payment Sheet for amount ${newOrder!.total}...",
-                            );
-                            await stripeService.presentPaymentSheet(
-                              context,
-                              amount:
-                                  newOrder!.total, // Lấy total từ Order mới tạo
-                              currency: 'vnd',
-                              orderId: orderIdForPayment, // Truyền ID đơn hàng
-                              merchantDisplayName: 'Khoi Ecom App',
-                            );
-
-                            // 4. Sheet đã đóng -> Kiểm tra trạng thái từ backend
-                            print(
-                              "Step 3: Payment sheet closed. Checking final order status from backend...",
-                            );
-                            // Sửa lỗi bằng cách tạo biến non-nullable cục bộ
-                            final String finalOrderId = orderIdForPayment!;
-                            String? finalStatus = await orderService
-                                .checkOrderStatus(
-                                  finalOrderId,
-                                ); // Dùng OrderService
-
-                            // 5. Xử lý kết quả cuối cùng
-                            if (finalStatus == 'paid') {
-                              print(
-                                "Step 4: Backend confirmed payment success for order $finalOrderId.",
-                              );
-                              // Giỏ hàng đã được xóa ở backend khi tạo order, chỉ cần fetch lại
-                              await cartProv.fetchCart(force: true);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Thanh toán thành công!"),
-                                    backgroundColor: Colors.green,
-                                  ),
+                            final paymentUrl = await vnpayService
+                                .createPaymentUrl(
+                                  orderId: orderIdForPayment!,
+                                  amount: newOrder.total,
                                 );
-                                Navigator.popUntil(
-                                  context,
-                                  (route) => route.isFirst,
-                                ); // Quay về Home
+
+                            if (paymentUrl != null) {
+                              // 3. --- THAY THẾ PHẦN NÀY ---
+                              print("Step 3: Navigating to VNPay WebView...");
+                              // Đảm bảo context vẫn còn tồn tại trước khi điều hướng
+                              if (context.mounted) {
+                                // Điều hướng đến màn hình WebView bằng route name đã đăng ký
+                                Navigator.of(context).pushNamed(
+                                  VnpayWebViewScreen
+                                      .routeName, // Sử dụng route name
+                                  arguments: {
+                                    // Truyền URL qua arguments
+                                    'paymentUrl': paymentUrl,
+                                    // Bạn có thể truyền thêm orderId nếu màn hình WebView cần
+                                    // 'orderId': orderIdForPayment,
+                                  },
+                                );
                               }
+                              // --- KẾT THÚC THAY THẾ ---
                             } else {
-                              print(
-                                "Step 4: Backend check FAILED or payment not completed (status: ${finalStatus ?? 'lỗi'}).",
+                              // Ném lỗi nếu không lấy được URL từ backend
+                              throw Exception(
+                                "Không lấy được URL thanh toán VNPay.",
                               );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      "Thanh toán chưa hoàn tất (trạng thái: ${finalStatus ?? 'lỗi'}). Đơn hàng ${newOrder!.code} đã được tạo.",
-                                    ),
-                                    backgroundColor: Colors.orange,
-                                  ),
-                                );
-                              }
                             }
+                            // --- Kết thúc logic VNPay ---
                           } catch (e) {
-                            // Lỗi xảy ra trong quá trình presentPaymentSheet hoặc checkOrderStatus
-                            print("Step 4: Payment process error: $e");
-                            // TODO: Gọi API backend để hủy Order vừa tạo (newOrder.id) nếu thanh toán thất bại?
+                            // Xử lý lỗi (chung cho cả tạo order và VNPay)
+                            print("Payment process error: $e");
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -701,11 +592,12 @@ class CartScreen extends StatelessWidget {
                             }
                           } finally {
                             // Luôn dừng loading nút
-                            if (context.mounted)
+                            if (context.mounted) {
                               setCheckoutState(() => _isCheckingOut = false);
+                            }
                             print("--- End Payment Process ---");
                           }
-                          // --- Kết thúc logic Stripe ---
+                          // --- Kết thúc logic thanh toán ---
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryColor,

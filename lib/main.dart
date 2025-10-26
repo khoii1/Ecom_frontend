@@ -15,38 +15,21 @@ import 'package:ecom_frontend/services/cart_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:ecom_frontend/services/stripe_service.dart';
 import 'package:ecom_frontend/screens/cart/cart_screen.dart';
+import 'package:ecom_frontend/services/vnpay_service.dart';
+import 'package:ecom_frontend/screens/payment/vnpay_webview_screen.dart';
 // --- THÊM IMPORT OrderService ---
 import 'package:ecom_frontend/services/order_service.dart';
 // --- KẾT THÚC THÊM ---
+// <<< THÊM IMPORT PaymentResultScreen >>>
+import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // --- Khởi tạo Stripe ---
-  const String stripePublishableKey = String.fromEnvironment(
-    'STRIPE_PUBLISHABLE_KEY',
-    defaultValue: 'pk_test_YourPublishableKey...', // <<< THAY KEY THẬT
-  );
-  if (stripePublishableKey.startsWith('pk_test_YourPublishableKey')) {
-    print("WARN: Using default Stripe publishable key.");
-  }
-  Stripe.publishableKey = stripePublishableKey;
-  try {
-    Stripe.merchantIdentifier = 'merchant.flutter.stripe.test';
-    await Stripe.instance.applySettings();
-    print("Stripe initialized successfully.");
-  } catch (e) {
-    print("Error initializing Stripe: $e");
-  }
-  // --- Kết thúc Stripe ---
-
   runApp(const MyApp());
 }
 
-// SỬA: Chuyển sang StatefulWidget để khởi tạo service 1 lần
+// Chuyển sang StatefulWidget để khởi tạo service 1 lần
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -55,7 +38,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // --- Khai báo các service và Dio làm biến instance ---
+  // Khai báo các service và Dio làm biến instance
   late final StorageService _storageService;
   late final Dio _dio;
   late final AuthService _authService;
@@ -64,25 +47,29 @@ class _MyAppState extends State<MyApp> {
   late final CategoryService _categoryService;
   late final StoreService _storeService;
   late final ProductService _productService;
-  late final StripeService _stripeService;
-  late final OrderService _orderService; // <<< THÊM KHAI BÁO
+  late final OrderService _orderService;
+  late final VnpayService _vnpayService;
 
   @override
   void initState() {
     super.initState();
-    // --- Khởi tạo tất cả service và Dio MỘT LẦN trong initState ---
-    _storageService = StorageService();
+    // Khởi tạo tất cả service và Dio MỘT LẦN trong initState
+    // Khởi tạo Dio trước
     _dio = Dio(
-      BaseOptions(baseUrl: 'http://10.0.2.2:8080'),
-    ); // 10.0.2.2 cho Android
+      // SỬA: Lấy baseUrl từ AppConfig để dễ thay đổi
+      // BaseOptions(baseUrl: AppConfig.baseUrl),
+      BaseOptions(
+        baseUrl: 'http://10.0.2.2:8080',
+      ), // Tạm giữ cho Android Emulator
+    );
 
-    // --- Cấu hình Interceptor ---
+    _storageService = StorageService();
+
+    // Cấu hình Interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          String? token = await _storageService.readToken(
-            'access_token',
-          ); // Dùng key 'access_token'
+          String? token = await _storageService.readToken('access_token');
           if (token != null && token.isNotEmpty) {
             print("Attaching token to request...");
             options.headers['Authorization'] = 'Bearer $token';
@@ -100,33 +87,30 @@ class _MyAppState extends State<MyApp> {
           }
           if (e.response?.statusCode == 401) {
             print("Unauthorized request - need to handle logout");
-            // TODO: Cần cơ chế global để gọi logout
+            // TODO: Cần cơ chế global để gọi logout từ AuthProvider
+            // Ví dụ: Dùng GlobalKey<NavigatorState> hoặc EventBus/Stream
           }
           return handler.next(e);
         },
       ),
     );
-    // --- KẾT THÚC Interceptor ---
 
-    // Khởi tạo các service
+    // Khởi tạo các service với Dio đã cấu hình
     _authService = AuthService(_dio);
     _cartService = CartService(_dio);
     _userService = UserService(_dio);
     _categoryService = CategoryService(_dio);
     _storeService = StoreService(_dio);
     _productService = ProductService(_dio);
-    _stripeService = StripeService(_dio);
-    _orderService = OrderService(_dio); // <<< THÊM KHỞI TẠO
-    // --- KẾT THÚC KHỞI TẠO ---
+    _orderService = OrderService(_dio); // Đã có OrderService
+    _vnpayService = VnpayService(_dio); // Đã có VnpayService
   }
 
   @override
   Widget build(BuildContext context) {
-    // Không khởi tạo service ở đây nữa
-
     return MultiProvider(
       providers: [
-        // --- Cung cấp Services đã khởi tạo trong initState ---
+        // Cung cấp Services đã khởi tạo trong initState
         Provider(create: (_) => _storageService),
         Provider(create: (_) => _authService),
         Provider(create: (_) => _cartService),
@@ -134,10 +118,12 @@ class _MyAppState extends State<MyApp> {
         Provider(create: (_) => _categoryService),
         Provider(create: (_) => _storeService),
         Provider(create: (_) => _productService),
-        Provider(create: (_) => _stripeService),
         Provider(
           create: (_) => _orderService,
-        ), // <<< THÊM OrderService Provider
+        ), // Đảm bảo OrderService được cung cấp
+        Provider(
+          create: (_) => _vnpayService,
+        ), // Đảm bảo VnpayService được cung cấp
         // --- Providers (State Management) ---
         ChangeNotifierProvider(
           create: (_) => AuthProvider(
@@ -146,10 +132,14 @@ class _MyAppState extends State<MyApp> {
             _userService,
           ), // Tự gọi _checkAuthStatus
         ),
+        // CartProvider phụ thuộc vào AuthProvider
         ChangeNotifierProxyProvider<AuthProvider, CartProvider>(
-          create: (_) => CartProvider(_cartService, null),
-          update: (_, authProvider, previousCartProvider) =>
-              CartProvider(_cartService, authProvider),
+          create: (_) =>
+              CartProvider(_cartService, null), // Ban đầu auth có thể null
+          update: (_, authProvider, previousCartProvider) => CartProvider(
+            _cartService,
+            authProvider,
+          ), // Cập nhật khi auth thay đổi
         ),
         ChangeNotifierProvider(
           create: (_) => ProductProvider(_productService)..fetchProducts(),
@@ -223,8 +213,34 @@ class _MyAppState extends State<MyApp> {
           ).copyWith(background: kBackgroundColor),
           useMaterial3: true,
         ),
+        routes: {
+          '/cart': (context) => CartScreen(),
+          PaymentResultScreen.routeName: (context) {
+            final args =
+                ModalRoute.of(context)?.settings.arguments
+                    as Map<String, dynamic>?;
+            return PaymentResultScreen(
+              orderId: args?['orderId'] ?? 'N/A',
+              initialStatus: args?['initialStatus'] ?? 'unknown',
+              message: args?['message'],
+              vnpResponseCode: args?['vnpResponseCode'],
+            );
+          },
+          // <<< THÊM ROUTE CHO WEBVIEW >>>
+          VnpayWebViewScreen.routeName: (context) {
+            final args =
+                ModalRoute.of(context)?.settings.arguments
+                    as Map<String, dynamic>?;
+            return VnpayWebViewScreen(
+              paymentUrl:
+                  args?['paymentUrl'] ?? 'about:blank', // Cung cấp URL mặc định
+              // orderId: args?['orderId'] ?? 'N/A', // Truyền orderId nếu cần
+            );
+          },
+        },
+        // Màn hình khởi đầu
         home: const AppWrapper(),
-        routes: {'/cart': (context) => CartScreen()},
+        // <<< CẬP NHẬT routes >>>
       ),
     );
   }
