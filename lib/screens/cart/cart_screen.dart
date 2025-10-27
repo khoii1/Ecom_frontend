@@ -196,28 +196,6 @@ class CartScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: kDefaultPadding * 1.5),
-          const Text(
-            "Mã giảm giá",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Expanded(
-                child: TextField(
-                  decoration: InputDecoration(hintText: "Nhập mã giảm giá"),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: () {
-                  /* TODO: Áp dụng mã khuyến mãi */
-                },
-                child: const Text("Áp dụng"),
-              ),
-            ],
-          ),
-          const SizedBox(height: kDefaultPadding * 2),
         ],
       ),
     );

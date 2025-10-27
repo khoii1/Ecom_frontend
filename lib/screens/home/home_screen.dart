@@ -1,4 +1,4 @@
-import 'dart:convert'; // để decode base64 data URL
+import 'dart:convert';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
@@ -11,10 +11,10 @@ import 'package:ecom_frontend/screens/search/search_screen.dart';
 import 'package:ecom_frontend/screens/seller/add_product_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // <<< THÊM import intl
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:ecom_frontend/screens/profile/profile_screen.dart';
 
-// ===================== Countdown riêng (không rebuild toàn Home) =====================
 class CountdownTicker extends StatefulWidget {
   final Duration initial;
   const CountdownTicker({super.key, required this.initial});
@@ -149,16 +149,7 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
     return [
       const HomeScreenContent(), // Home (index 0)
       const SearchScreen(), // Search (index 1)
-      Scaffold(
-        // Profile (index 2)
-        appBar: AppBar(title: const Text('Tài khoản')),
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () => context.read<AuthProvider>().logout(),
-            child: const Text("Đăng xuất"),
-          ),
-        ),
-      ),
+      const ProfileScreen(), // Profile (index 2) - Sử dụng Widget mới
     ];
   }
 
@@ -175,7 +166,7 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
         );
         return;
       } else if (index > 2) {
-        actualIndex = index - 1; // Profile ở _widgetOptions là 2
+        actualIndex = index - 1; 
       }
     }
 

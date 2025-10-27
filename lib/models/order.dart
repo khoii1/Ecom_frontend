@@ -10,6 +10,7 @@ class Order {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? firstItemImageUrl;
 
   Order({
     required this.id,
@@ -21,6 +22,7 @@ class Order {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.firstItemImageUrl,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class Order {
       status: json['status'] as String? ?? 'unknown',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
+      firstItemImageUrl: json['first_item_image_url'] as String?,
     );
   }
 }

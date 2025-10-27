@@ -13,7 +13,11 @@ class ProductService {
       final List<dynamic> data = response.data;
       return data.map((json) => Product.fromJson(json)).toList();
     } on DioException catch (e) {
+      print("DioException getProducts: ${e.response?.data}");
       throw Exception(e.response?.data['message'] ?? 'Lỗi lấy sản phẩm');
+    } catch (e) {
+      print("Exception getProducts: $e");
+      throw Exception('Lỗi không xác định khi lấy sản phẩm');
     }
   }
 
@@ -26,16 +30,16 @@ class ProductService {
       if (e.response?.statusCode == 404) {
         throw Exception('Không tìm thấy sản phẩm');
       }
+      print("DioException getProductDetail($productId): ${e.response?.data}");
       throw Exception(
         e.response?.data['message'] ?? 'Lỗi lấy chi tiết sản phẩm',
       );
     } catch (e) {
-      print("Lỗi không xác định khi lấy chi tiết sản phẩm: $e");
+      print("Exception getProductDetail($productId): $e");
       throw Exception('Lỗi không xác định khi lấy chi tiết sản phẩm');
     }
   }
 
-  // Upload ảnh sản phẩm -> trả về URL ảnh
   Future<String?> uploadImage(File imageFile) async {
     try {
       final fileName = imageFile.path.split('/').last;
@@ -49,12 +53,12 @@ class ProductService {
         '/products/upload-image',
         data: formData,
       );
-      // Tùy backend: có thể trả về 'image_url' hoặc 'imageUrl'
       return response.data['image_url'];
     } on DioException catch (e) {
+      print("DioException uploadImage: ${e.response?.data}");
       throw Exception(e.response?.data['message'] ?? 'Lỗi khi upload ảnh');
     } catch (e) {
-      print("Lỗi không xác định khi upload ảnh: $e");
+      print("Exception uploadImage: $e");
       throw Exception('Lỗi không xác định khi upload ảnh');
     }
   }
@@ -68,6 +72,7 @@ class ProductService {
     double? discountPercentage,
     String? categoryId,
     String? imageUrl,
+    String status = 'active', // Mặc định là active
   }) async {
     try {
       final Map<String, dynamic> productData = {
@@ -81,8 +86,10 @@ class ProductService {
         if (categoryId != null && categoryId.isNotEmpty)
           'category_id': categoryId,
         if (imageUrl != null) 'image_url': imageUrl,
-        'status': 'active',
+        'status': status, // Gửi status lên backend
       };
+
+      productData.removeWhere((key, value) => value == null);
 
       final response = await _dio.post('/products', data: productData);
       return Product.fromJson(response.data);
@@ -92,6 +99,49 @@ class ProductService {
     } catch (e) {
       print("Lỗi không xác định khi tạo sản phẩm: $e");
       throw Exception('Lỗi không xác định khi tạo sản phẩm');
+    }
+  }
+
+  Future<Product> updateProduct(
+    String productId,
+    Map<String, dynamic> productData,
+  ) async {
+    try {
+      final response = await _dio.put(
+        '/products/$productId',
+        data: productData,
+      );
+      return Product.fromJson(response.data);
+    } on DioException catch (e) {
+      print(
+        "DioException khi cập nhật sản phẩm $productId: ${e.response?.data}",
+      );
+      throw Exception(
+        e.response?.data['message'] ?? 'Lỗi khi cập nhật sản phẩm',
+      );
+    } catch (e) {
+      print("Lỗi không xác định khi cập nhật sản phẩm $productId: $e");
+      throw Exception('Lỗi không xác định khi cập nhật sản phẩm');
+    }
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    try {
+      final response = await _dio.delete('/products/$productId');
+      // Kiểm tra status code (thường là 200 OK hoặc 204 No Content)
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception(
+          'Lỗi API khi xóa sản phẩm (Status: ${response.statusCode})',
+        );
+      }
+      print("Xóa sản phẩm $productId thành công từ backend.");
+      // --- KẾT THÚC GỌI API ---
+    } on DioException catch (e) {
+      print("DioException khi xóa sản phẩm $productId: ${e.response?.data}");
+      throw Exception(e.response?.data['message'] ?? 'Lỗi khi xóa sản phẩm');
+    } catch (e) {
+      print("Lỗi không xác định khi xóa sản phẩm $productId: $e");
+      throw Exception('Lỗi không xác định khi xóa sản phẩm');
     }
   }
 }
