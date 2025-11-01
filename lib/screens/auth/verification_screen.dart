@@ -52,7 +52,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         if (mounted && error == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("✅ Xác thực thành công! Vui lòng đăng nhập."),
+              content: Text("Xác thực thành công! Vui lòng đăng nhập."),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
             ),
@@ -93,7 +93,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
               error!.contains("Invalid") ||
                       error!.contains("Sai") ||
                       error!.contains("hết hạn")
-                  ? "❌ Mã xác thực không hợp lệ hoặc đã hết hạn."
+                  ? "Mã xác thực không hợp lệ hoặc đã hết hạn."
                   : error!,
             ),
             backgroundColor: Colors.redAccent,
@@ -164,28 +164,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ),
             const SizedBox(height: 24),
             TextButton(
-              onPressed: () async {
-                // Gợi ý: gọi lại forgotPassword để gửi mã mới
-                // final auth = context.read<AuthProvider>();
-                // final err = await auth.forgotPassword(widget.email);
-                // if (err == null) {
-                //   ScaffoldMessenger.of(context).showSnackBar(
-                //     const SnackBar(
-                //       content: Text("Đã gửi lại mã xác thực."),
-                //       backgroundColor: Colors.green,
-                //       behavior: SnackBarBehavior.floating,
-                //     ),
-                //   );
-                // } else {
-                //   ScaffoldMessenger.of(context).showSnackBar(
-                //     SnackBar(
-                //       content: Text(err),
-                //       backgroundColor: Colors.redAccent,
-                //       behavior: SnackBarBehavior.floating,
-                //     ),
-                //   );
-                // }
-              },
+              onPressed: () async {},
               child: const Text(
                 "Không nhận được email? Gửi lại mã",
                 style: TextStyle(color: kSecondaryTextColor),

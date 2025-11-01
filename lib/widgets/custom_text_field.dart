@@ -40,7 +40,7 @@ class CustomTextField extends StatelessWidget {
           decoration: InputDecoration(
             prefixIcon: Icon(prefixIcon, color: kSecondaryTextColor),
             suffixIcon: suffixIcon,
-            hintText: "Input your $labelText",
+            hintText: "Vui lòng nhập $labelText",
             hintStyle: const TextStyle(color: kSecondaryTextColor),
             filled: true,
             fillColor: Colors.white,
