@@ -17,9 +17,9 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Đính kèm Access Token nếu có
+          // Đính kèm Access Token nếu có (trừ các endpoint auth)
           final accessToken = await _storageService.readToken('access_token');
-          if (accessToken != null) {
+          if (accessToken != null && !options.path.contains('/auth/')) {
             options.headers['Authorization'] = 'Bearer $accessToken';
           }
           return handler.next(options);

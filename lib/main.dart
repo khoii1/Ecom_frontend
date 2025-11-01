@@ -13,6 +13,7 @@ import 'package:ecom_frontend/providers/cart_provider.dart';
 import 'package:ecom_frontend/services/auth_service.dart';
 import 'package:ecom_frontend/services/cart_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
+import 'package:ecom_frontend/utils/app_config.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:provider/provider.dart';
 import 'package:ecom_frontend/screens/cart/cart_screen.dart';
@@ -50,8 +51,8 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Khởi tạo Dio (tạm dùng baseUrl cho Android Emulator)
-    _dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:8080'));
+    // Sử dụng baseUrl từ AppConfig thay vì hardcode
+    _dio = Dio(BaseOptions(baseUrl: AppConfig.baseUrl));
 
     _storageService = StorageService();
 
@@ -61,10 +62,12 @@ class _MyAppState extends State<MyApp> {
         onRequest: (options, handler) async {
           final token = await _storageService.readToken('access_token');
           if (token != null && token.isNotEmpty) {
-            print("Attaching token to request...");
             options.headers['Authorization'] = 'Bearer $token';
           } else {
-            print("No auth token found for request to ${options.path}");
+            // Không log lỗi cho các endpoint auth vì chúng không cần token
+            if (!options.path.contains('/auth/')) {
+              print("No auth token found for request to ${options.path}");
+            }
           }
           return handler.next(options);
         },
