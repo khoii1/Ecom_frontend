@@ -27,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isLoading = false);
 
     if (error == null) {
-      // ✅ Gửi thành công → chuyển sang màn hình nhập OTP
+      // Gửi thành công → chuyển sang màn hình nhập OTP
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -38,7 +38,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       );
     } else {
-      // ❌ Thông báo lỗi
+      // Thông báo lỗi
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),

@@ -33,7 +33,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("❌ Mật khẩu không khớp"),
+          content: Text("Mật khẩu không khớp"),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -67,7 +67,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
     if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("✅ Đổi mật khẩu thành công! Vui lòng đăng nhập lại."),
+          content: Text("Đổi mật khẩu thành công! Vui lòng đăng nhập lại."),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),

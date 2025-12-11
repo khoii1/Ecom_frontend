@@ -6,11 +6,17 @@ class OrderService {
 
   OrderService(this._dio);
 
-  
-  Future<Order> createOrderFromCart() async {
+  Future<Order> createOrderFromCart({
+    String? discountId,
+    String paymentMethod = 'cash',
+  }) async {
     try {
       print("Gọi API backend (POST /orders) để tạo đơn hàng từ giỏ hàng...");
-      final response = await _dio.post('/orders');
+      final data = <String, dynamic>{'payment_method': paymentMethod};
+      if (discountId != null) {
+        data['discount_id'] = discountId;
+      }
+      final response = await _dio.post('/orders', data: data);
 
       if (response.statusCode == 201 && response.data != null) {
         print(
@@ -107,5 +113,122 @@ class OrderService {
     }
   }
 
-  
+  Future<Order> getOrderDetail(String orderId) async {
+    try {
+      final response = await _dio.get('/orders/$orderId');
+      return Order.fromJson(response.data);
+    } on DioException catch (e) {
+      print("DioException getOrderDetail: ${e.response?.data}");
+      throw Exception(
+        e.response?.data['message'] ?? 'Lỗi khi lấy chi tiết đơn hàng',
+      );
+    } catch (e) {
+      print("Exception getOrderDetail: $e");
+      throw Exception('Lỗi không xác định khi lấy chi tiết đơn hàng');
+    }
+  }
+
+  // Xác nhận đã nhận hàng (customer)
+  Future<void> confirmDelivery({
+    required String orderId,
+    required bool confirmed,
+    String? note,
+  }) async {
+    try {
+      await _dio.post(
+        '/orders/$orderId/confirm-delivery',
+        data: {
+          'confirmed': confirmed,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Lỗi khi xác nhận giao hàng',
+      );
+    }
+  }
+
+  // Gán shipper cho đơn hàng (seller/admin)
+  Future<void> assignShipper({
+    required String orderId,
+    required String shipperId,
+  }) async {
+    try {
+      await _dio.post(
+        '/orders/$orderId/assign-shipper',
+        data: {'shipper_id': shipperId},
+      );
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Lỗi khi gán shipper');
+    }
+  }
+
+  // Cập nhật trạng thái đơn hàng (seller/admin)
+  Future<void> updateOrderStatus({
+    required String orderId,
+    required String status,
+    String? description,
+    String? location,
+    String? note,
+    String? trackingNumber,
+    String? shippingMethod,
+  }) async {
+    try {
+      final data = <String, dynamic>{'status': status};
+      if (description != null && description.isNotEmpty) {
+        data['description'] = description;
+      }
+      if (location != null && location.isNotEmpty) {
+        data['location'] = location;
+      }
+      if (note != null && note.isNotEmpty) {
+        data['note'] = note;
+      }
+      if (trackingNumber != null && trackingNumber.isNotEmpty) {
+        data['tracking_number'] = trackingNumber;
+      }
+      if (shippingMethod != null && shippingMethod.isNotEmpty) {
+        data['shipping_method'] = shippingMethod;
+      }
+
+      await _dio.patch('/orders/$orderId/status', data: data);
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Lỗi khi cập nhật trạng thái đơn hàng',
+      );
+    }
+  }
+
+  // Lấy đơn hàng theo store (seller/admin)
+  Future<List<Order>> getOrdersByStore(String storeId) async {
+    try {
+      print("OrderService: Gọi API backend GET /orders/store/$storeId");
+      final response = await _dio.get('/orders/store/$storeId');
+
+      if (response.statusCode == 200 && response.data is List) {
+        final List<dynamic> data = response.data;
+        print("OrderService: Đã nhận ${data.length} đơn hàng từ store.");
+        return data.map((json) => Order.fromJson(json)).toList();
+      } else {
+        print(
+          "OrderService: Định dạng phản hồi không hợp lệ từ getOrdersByStore.",
+        );
+        return [];
+      }
+    } on DioException catch (e) {
+      print(
+        "OrderService: DioException khi lấy đơn hàng của store: ${e.response?.data ?? e.message}",
+      );
+      throw Exception(
+        e.response?.data?['message'] ??
+            'Lỗi mạng khi lấy đơn hàng của cửa hàng',
+      );
+    } catch (e) {
+      print("OrderService: Lỗi không xác định khi lấy đơn hàng của store: $e");
+      throw Exception(
+        'Lỗi không xác định khi lấy đơn hàng của cửa hàng: ${e.toString()}',
+      );
+    }
+  }
 }

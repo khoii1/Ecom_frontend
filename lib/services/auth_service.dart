@@ -5,6 +5,23 @@ class AuthService {
 
   AuthService(this._dio);
 
+  /// Helper để lấy message lỗi từ response một cách an toàn
+  String _getErrorMessage(dynamic responseData, String defaultMessage) {
+    if (responseData == null) return defaultMessage;
+    if (responseData is Map<String, dynamic>) {
+      // Trường hợp lỗi validation: { errors: [...] }
+      if (responseData['errors'] != null && responseData['errors'] is List) {
+        final errors = responseData['errors'] as List;
+        if (errors.isNotEmpty && errors[0] is Map) {
+          return errors[0]['msg']?.toString() ?? defaultMessage;
+        }
+      }
+      // Trường hợp lỗi thông thường: { message: "..." }
+      return responseData['message']?.toString() ?? defaultMessage;
+    }
+    return defaultMessage;
+  }
+
   // ===== Đăng nhập =====
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
@@ -12,9 +29,12 @@ class AuthService {
         '/auth/login',
         data: {'email': email, 'password': password},
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi đăng nhập');
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi đăng nhập'));
     }
   }
 
@@ -35,9 +55,13 @@ class AuthService {
           'role': role,
         },
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        // Trả về response data, bao gồm cả warning nếu email không gửi được
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi đăng ký');
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi đăng ký'));
     }
   }
 
@@ -48,9 +72,28 @@ class AuthService {
         '/auth/verify-email',
         data: {'email': email, 'code': code},
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi xác thực OTP');
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi xác thực OTP'));
+    }
+  }
+
+  // ===== Gửi lại email xác minh =====
+  Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
+    try {
+      final response = await _dio.post(
+        '/auth/resend-verification-email',
+        data: {'email': email},
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
+    } on DioException catch (e) {
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi gửi lại email xác minh'));
     }
   }
 
@@ -61,9 +104,12 @@ class AuthService {
         '/auth/forgot-password',
         data: {'email': email},
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi gửi email khôi phục');
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi gửi email khôi phục'));
     }
   }
 
@@ -77,11 +123,12 @@ class AuthService {
         '/auth/verify-reset-code',
         data: {'email': email, 'code': code},
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(
-        e.response?.data['message'] ?? 'Mã xác thực không hợp lệ',
-      );
+      throw Exception(_getErrorMessage(e.response?.data, 'Mã xác thực không hợp lệ'));
     }
   }
 
@@ -96,9 +143,25 @@ class AuthService {
         '/auth/reset-password',
         data: {'email': email, 'code': code, 'newPassword': newPassword},
       );
-      return response.data;
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('Phản hồi từ server không hợp lệ');
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Lỗi đặt lại mật khẩu');
+      throw Exception(_getErrorMessage(e.response?.data, 'Lỗi đặt lại mật khẩu'));
+    }
+  }
+
+  // ===== Đăng xuất =====
+  Future<void> logout() async {
+    try {
+      await _dio.post('/auth/logout');
+    } on DioException catch (e) {
+      // Không throw exception vì logout có thể thành công ngay cả khi server lỗi
+      // (token đã được xóa ở client)
+      print("DioException logout: ${e.response?.data}");
+    } catch (e) {
+      print("Exception logout: $e");
     }
   }
 }

@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:ecom_frontend/app_wrapper.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/providers/cart_provider.dart';
-// import 'package:ecom_frontend/services/api_client.dart';
 import 'package:ecom_frontend/services/auth_service.dart';
 import 'package:ecom_frontend/services/cart_service.dart';
 import 'package:ecom_frontend/services/storage_service.dart';
@@ -21,6 +20,25 @@ import 'package:ecom_frontend/services/vnpay_service.dart';
 import 'package:ecom_frontend/screens/payment/vnpay_webview_screen.dart';
 import 'package:ecom_frontend/services/order_service.dart';
 import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
+import 'package:ecom_frontend/screens/wallet/wallet_screen.dart';
+import 'package:ecom_frontend/screens/wallet/topup_screen.dart';
+import 'package:ecom_frontend/services/review_service.dart';
+import 'package:ecom_frontend/services/discount_service.dart';
+import 'package:ecom_frontend/services/wishlist_service.dart';
+import 'package:ecom_frontend/services/address_service.dart';
+import 'package:ecom_frontend/services/notification_service.dart';
+import 'package:ecom_frontend/services/product_variant_service.dart';
+import 'package:ecom_frontend/services/banner_service.dart';
+import 'package:ecom_frontend/services/shipper_service.dart';
+import 'package:ecom_frontend/services/chat_service.dart';
+import 'package:ecom_frontend/services/analytics_service.dart';
+import 'package:ecom_frontend/services/return_service.dart';
+import 'package:ecom_frontend/services/wallet_service.dart';
+import 'package:ecom_frontend/providers/locale_provider.dart';
+import 'package:ecom_frontend/l10n/app_localizations.dart';
+
+// Global navigator key để access context từ bất kỳ đâu (dùng cho 401 handling)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +64,18 @@ class _MyAppState extends State<MyApp> {
   late final ProductService _productService;
   late final OrderService _orderService;
   late final VnpayService _vnpayService;
+  late final ReviewService _reviewService;
+  late final DiscountService _discountService;
+  late final WishlistService _wishlistService;
+  late final AddressService _addressService;
+  late final NotificationService _notificationService;
+  late final ProductVariantService _productVariantService;
+  late final BannerService _bannerService;
+  late final ShipperService _shipperService;
+  late final ChatService _chatService;
+  late final AnalyticsService _analyticsService;
+  late final ReturnService _returnService;
+  late final WalletService _walletService;
 
   @override
   void initState() {
@@ -79,8 +109,22 @@ class _MyAppState extends State<MyApp> {
             );
           }
           if (e.response?.statusCode == 401) {
-            print("Unauthorized request - need to handle logout");
-            // TODO: cơ chế global để gọi logout từ AuthProvider nếu cần
+            print("Unauthorized request - Token hết hạn, đăng xuất...");
+            // Xóa token khỏi storage
+            await _storageService.deleteAllTokens();
+            
+            // Gọi logout từ AuthProvider nếu có context và Navigator đã sẵn sàng
+            final navigator = navigatorKey.currentState;
+            final context = navigatorKey.currentContext;
+            if (context != null && navigator != null) {
+              try {
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                await authProvider.logout();
+                print("Đã đăng xuất thành công do token hết hạn");
+              } catch (e) {
+                print("Lỗi khi gọi logout: $e");
+              }
+            }
           }
           return handler.next(e);
         },
@@ -96,6 +140,18 @@ class _MyAppState extends State<MyApp> {
     _productService = ProductService(_dio);
     _orderService = OrderService(_dio);
     _vnpayService = VnpayService(_dio);
+    _reviewService = ReviewService(_dio);
+    _discountService = DiscountService(_dio);
+    _wishlistService = WishlistService(_dio);
+    _addressService = AddressService(_dio);
+    _notificationService = NotificationService(_dio);
+    _productVariantService = ProductVariantService(_dio);
+    _bannerService = BannerService(_dio);
+    _shipperService = ShipperService(_dio);
+    _chatService = ChatService(_dio);
+    _analyticsService = AnalyticsService(_dio);
+    _returnService = ReturnService(_dio);
+    _walletService = WalletService(_dio);
   }
 
   @override
@@ -112,6 +168,18 @@ class _MyAppState extends State<MyApp> {
         Provider(create: (_) => _productService),
         Provider(create: (_) => _orderService),
         Provider(create: (_) => _vnpayService),
+        Provider(create: (_) => _reviewService),
+        Provider(create: (_) => _discountService),
+        Provider(create: (_) => _wishlistService),
+        Provider(create: (_) => _addressService),
+        Provider(create: (_) => _notificationService),
+        Provider(create: (_) => _productVariantService),
+        Provider(create: (_) => _bannerService),
+        Provider(create: (_) => _shipperService),
+        Provider(create: (_) => _chatService),
+        Provider(create: (_) => _analyticsService),
+        Provider(create: (_) => _returnService),
+        Provider(create: (_) => _walletService),
 
         // State management
         ChangeNotifierProvider(
@@ -129,10 +197,25 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (_) => CategoryProvider(_categoryService)..fetchCategories(),
         ),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
-      child: MaterialApp(
-        title: 'E-commerce App',
-        debugShowCheckedModeBanner: false,
+      child: Consumer<LocaleProvider>(
+        builder: (context, localeProvider, _) {
+          return MaterialApp(
+            navigatorKey: navigatorKey, // Thêm navigator key để access context từ interceptor
+            title: 'E-commerce App',
+            debugShowCheckedModeBanner: false,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('vi', 'VN'),
+              Locale('en', 'US'),
+            ],
+            locale: Locale(
+              localeProvider.locale == AppLocale.vi ? 'vi' : 'en',
+              localeProvider.locale == AppLocale.vi ? 'VN' : 'US',
+            ),
         theme: ThemeData(
           primaryColor: kPrimaryColor,
           scaffoldBackgroundColor: kBackgroundColor,
@@ -197,6 +280,7 @@ class _MyAppState extends State<MyApp> {
         ),
         // Định nghĩa routes chính
         routes: {
+          '/': (context) => const AppWrapper(), // Route mặc định
           '/cart': (context) => CartScreen(),
           PaymentResultScreen.routeName: (context) {
             final args =
@@ -217,8 +301,18 @@ class _MyAppState extends State<MyApp> {
               paymentUrl: args?['paymentUrl'] ?? 'about:blank',
             );
           },
+          WalletScreen.routeName: (context) => const WalletScreen(),
+          TopupScreen.routeName: (context) => const TopupScreen(),
         },
-        home: const AppWrapper(), // Màn hình khởi đầu
+        initialRoute: '/', // Sử dụng initialRoute thay vì home
+        onGenerateRoute: (settings) {
+          // Fallback route nếu không tìm thấy route nào
+          return MaterialPageRoute(
+            builder: (context) => const AppWrapper(),
+          );
+        },
+          );
+        },
       ),
     );
   }

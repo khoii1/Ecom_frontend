@@ -1,9 +1,6 @@
 import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/models/store.dart';
 import 'package:ecom_frontend/providers/product_provider.dart';
-// --- THÊM IMPORT ---
-import 'package:ecom_frontend/services/product_service.dart'; // Thêm dòng này
-// --- KẾT THÚC THÊM IMPORT ---
 import 'package:ecom_frontend/services/store_service.dart';
 import 'package:ecom_frontend/utils/constants.dart';
 import 'package:flutter/material.dart';
@@ -199,10 +196,11 @@ class _MyProductsStoreScreenState extends State<MyProductsStoreScreen> {
     return RefreshIndicator(
         onRefresh: _refreshData,
         color: kPrimaryColor,
-        child: ListView.separated(
-           padding: const EdgeInsets.symmetric(vertical: kDefaultPadding / 2, horizontal: kDefaultPadding / 2),
+        child: ListView.builder(
+           padding: const EdgeInsets.symmetric(
+             vertical: kDefaultPadding / 2,
+           ),
            itemCount: sellerProducts.length,
-           separatorBuilder: (context, index) => const Divider(height: kDefaultPadding / 2),
            itemBuilder: (context, index) {
               final product = sellerProducts[index];
               return _buildProductListItem(context, product);
@@ -217,12 +215,26 @@ class _MyProductsStoreScreenState extends State<MyProductsStoreScreen> {
      final String displayPrice = _currencyFormatter.format(product.finalPrice ?? product.price);
      final String? originalPrice = hasDiscount ? _currencyFormatter.format(product.price) : null;
 
-      return ListTile(
-         leading: SizedBox(
-           width: 60,
-           height: 60,
-           child: ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
+      return Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: kDefaultPadding / 2,
+          vertical: kSmallPadding / 2,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(kBorderRadius),
+          boxShadow: kCardShadow,
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: kDefaultPadding,
+            vertical: kSmallPadding,
+          ),
+          leading: SizedBox(
+            width: 60,
+            height: 60,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(kSmallBorderRadius),
               child: (product.imageUrl != null && product.imageUrl!.isNotEmpty)
                   ? Image.network(
                       product.imageUrl!,
@@ -284,29 +296,30 @@ class _MyProductsStoreScreenState extends State<MyProductsStoreScreen> {
               ),
            ],
          ),
-         trailing: Row( // Thêm nút Sửa/Xóa
-           mainAxisSize: MainAxisSize.min, // Giữ kích thước nhỏ nhất
-           children: [
-             IconButton(
+          trailing: Row( // Thêm nút Sửa/Xóa
+            mainAxisSize: MainAxisSize.min, // Giữ kích thước nhỏ nhất
+            children: [
+              IconButton(
                 icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent, size: 20),
                 tooltip: 'Chỉnh sửa',
                 onPressed: () {
-                   // Điều hướng đến màn hình sửa sản phẩm, truyền product vào
-                   Navigator.push(context, MaterialPageRoute(builder: (_) => AddProductScreen(productToEdit: product)))
+                  // Điều hướng đến màn hình sửa sản phẩm, truyền product vào
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => AddProductScreen(productToEdit: product)))
                       .then((_) => _refreshData()); // Refresh lại sau khi sửa
                 },
-             ),
-             IconButton(
+              ),
+              IconButton(
                 icon: const Icon(Icons.delete_outline, color: kHeartColor, size: 20),
                 tooltip: 'Xóa sản phẩm',
                 onPressed: () => _confirmDeleteProduct(context, product), // Gọi hàm xác nhận xóa
-             ),
-           ],
-         ),
-         onTap: () {
+              ),
+            ],
+          ),
+          onTap: () {
             // Điều hướng đến chi tiết sản phẩm
-             Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: product.id)));
-         },
+            Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: product.id)));
+          },
+        ),
       );
   }
 
@@ -336,7 +349,7 @@ class _MyProductsStoreScreenState extends State<MyProductsStoreScreen> {
      if (confirmed == true && context.mounted) {
         try {
            // Dùng read vì đang ở trong callback
-           final productService = context.read<ProductService>();
+           // final productService = context.read<ProductService>();
            // --- GỌI API XÓA THỰC SỰ (CẦN THÊM Ở BACKEND VÀ ProductService) ---
            // await productService.deleteProduct(product.id);
            print("Gọi API DELETE /products/${product.id} (Mô phỏng)");

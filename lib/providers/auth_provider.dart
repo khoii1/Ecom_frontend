@@ -83,6 +83,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// ===== Đăng ký tài khoản mới =====
+  /// Trả về null nếu thành công, hoặc error message nếu có lỗi
+  /// Nếu email chưa gửi được nhưng user đã tạo, vẫn trả về null (thành công)
   Future<String?> register({
     required String fullName,
     required String email,
@@ -96,8 +98,23 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         role: role,
       );
+      
+      // Kiểm tra nếu email chưa gửi được nhưng user đã tạo
+      // Response có thể chứa emailSent: false và canResend: true
+      // Trong trường hợp này vẫn coi là thành công
+      
       _authStatus = AuthStatus.unauthenticated;
       notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// ===== Gửi lại email xác minh =====
+  Future<String?> resendVerificationEmail(String email) async {
+    try {
+      await _authService.resendVerificationEmail(email);
       return null;
     } catch (e) {
       return e.toString();

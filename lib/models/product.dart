@@ -12,6 +12,8 @@ class Product {
   final double? finalPrice; // Giá sau khi giảm (thường được tính toán)
   final double? rating;
   final String? imageUrl;
+  final List<String>? imageUrls; // Nhiều ảnh sản phẩm
+  final int stockQuantity; // Số lượng tồn kho
   final String status;
   final String? description; // Mô tả sản phẩm
 
@@ -25,6 +27,8 @@ class Product {
     this.finalPrice,
     this.rating,
     this.imageUrl,
+    this.imageUrls,
+    this.stockQuantity = 0,
     required this.status,
     this.description, // Thêm vào constructor
   });
@@ -40,6 +44,10 @@ class Product {
       finalPrice: parseDouble(json['final_price']),
       rating: parseDouble(json['rating']),
       imageUrl: json['image_url'] as String?,
+      imageUrls: json['image_urls'] != null 
+          ? List<String>.from(json['image_urls'])
+          : (json['image_url'] != null ? [json['image_url'] as String] : null),
+      stockQuantity: json['stock_quantity'] != null ? (json['stock_quantity'] as num).toInt() : 0,
       status: json['status'] ?? 'inactive',
       description: json['description'] as String?,
     );

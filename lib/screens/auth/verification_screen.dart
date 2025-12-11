@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/screens/auth/create_new_password_screen.dart';
@@ -27,6 +28,9 @@ class VerificationScreen extends StatefulWidget {
 class _VerificationScreenState extends State<VerificationScreen> {
   final _pinController = TextEditingController();
   bool _isLoading = false;
+  int _resendCountdown = 30; // Countdown 30 giây
+  bool _canResend = false;
+  Timer? _countdownTimer;
 
   /// Xác nhận mã OTP (đăng ký hoặc quên mật khẩu)
   Future<void> _confirmCode() async {
@@ -90,11 +94,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              error!.contains("Invalid") ||
-                      error!.contains("Sai") ||
-                      error!.contains("hết hạn")
+              error.contains("Invalid") ||
+                      error.contains("Sai") ||
+                      error.contains("hết hạn")
                   ? "Mã xác thực không hợp lệ hoặc đã hết hạn."
-                  : error!,
+                  : error,
             ),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
@@ -105,7 +109,38 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    setState(() {
+      _canResend = false;
+      _resendCountdown = 30;
+    });
+    
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _resendCountdown--;
+        });
+        if (_resendCountdown <= 0) {
+          timer.cancel();
+          setState(() {
+            _canResend = true;
+          });
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _countdownTimer?.cancel();
     _pinController.dispose();
     super.dispose();
   }
@@ -164,10 +199,48 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ),
             const SizedBox(height: 24),
             TextButton(
-              onPressed: () async {},
-              child: const Text(
-                "Không nhận được email? Gửi lại mã",
-                style: TextStyle(color: kSecondaryTextColor),
+              onPressed: (_isLoading || !_canResend) ? null : () async {
+                setState(() {
+                  _canResend = false;
+                  _resendCountdown = 30;
+                });
+                
+                final authProvider = context.read<AuthProvider>();
+                final error = await authProvider.resendVerificationEmail(widget.email);
+                
+                if (!mounted) return;
+                
+                if (error == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Đã gửi lại email xác minh. Vui lòng kiểm tra email."),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  // Bắt đầu countdown lại
+                  _startCountdown();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  // Nếu lỗi, cho phép resend lại ngay
+                  setState(() {
+                    _canResend = true;
+                  });
+                }
+              },
+              child: Text(
+                _canResend
+                    ? "Không nhận được email? Gửi lại mã"
+                    : "Gửi lại mã sau ${_resendCountdown}s",
+                style: TextStyle(
+                  color: _canResend ? kSecondaryTextColor : kSecondaryTextColor.withValues(alpha: 0.5),
+                ),
               ),
             ),
             const SizedBox(height: 24),

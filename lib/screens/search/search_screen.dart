@@ -4,8 +4,13 @@ import 'package:intl/intl.dart';
 
 import 'package:ecom_frontend/models/product.dart';
 import 'package:ecom_frontend/providers/product_provider.dart';
+import 'package:ecom_frontend/providers/category_provider.dart';
 import 'package:ecom_frontend/screens/product/product_detail_screen.dart';
 import 'package:ecom_frontend/utils/constants.dart';
+import 'package:ecom_frontend/widgets/product_filter_widget.dart';
+import 'package:ecom_frontend/services/product_service.dart';
+import 'package:ecom_frontend/services/wishlist_service.dart';
+import 'package:ecom_frontend/l10n/app_localizations.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -26,6 +31,14 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Product> _searchResults = [];
   bool _isLoading = false;
   String _currentQuery = "";
+  ProductFilter _currentFilter = ProductFilter();
+
+  // Wishlist state - Map<productId, isInWishlist>
+  final Map<String, bool> _wishlistStatus = {};
+  final Map<String, bool> _checkingWishlist = {}; // Track which products are being checked/toggled
+  bool _isCheckingAllWishlist = false; // Flag to prevent multiple simultaneous checks
+  final Set<String> _checkedProducts = {}; // Track products that have already been checked (to avoid re-checking)
+  bool _isPostFrameCallbackPending = false; // Prevent multiple postFrameCallbacks
 
   @override
   void initState() {
@@ -48,8 +61,8 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  // Lọc kết quả theo từ khóa
-  void _performSearch(String query) {
+  // Lọc kết quả theo từ khóa và bộ lọc
+  Future<void> _performSearch(String query) async {
     if (!mounted) return;
 
     setState(() {
@@ -57,20 +70,258 @@ class _SearchScreenState extends State<SearchScreen> {
       _currentQuery = query.toLowerCase();
     });
 
-    final allProducts = context.read<ProductProvider>().products;
+    try {
+      final productService = context.read<ProductService>();
+      // Chuyển categoryId từ int sang string nếu có
+      final categoryIdStr = _currentFilter.categoryId != null
+          ? _currentFilter.categoryId.toString()
+          : null;
+      final products = await productService.getProducts(
+        search: query.isNotEmpty ? query : null,
+        categoryIdString: categoryIdStr,
+        minPrice: _currentFilter.minPrice,
+        maxPrice: _currentFilter.maxPrice,
+        minRating: _currentFilter.minRating,
+        sort: _currentFilter.sort,
+      );
 
-    if (_currentQuery.isEmpty) {
-      _searchResults = List.from(allProducts);
-    } else {
-      _searchResults = allProducts.where((p) {
-        final titleLower = p.title.toLowerCase();
-        return titleLower.contains(_currentQuery);
-      }).toList();
+      if (mounted) {
+        setState(() {
+          _searchResults = products;
+          _isLoading = false;
+        });
+        // Check wishlist status for all products (only check products that haven't been checked yet)
+        // Use a small delay to avoid checking during setState rebuild
+        if (!_isPostFrameCallbackPending) {
+          _isPostFrameCallbackPending = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _isPostFrameCallbackPending = false;
+            if (mounted) {
+              final productsToCheck = products.where((p) {
+                return !_wishlistStatus.containsKey(p.id) && 
+                       _checkingWishlist[p.id] != true &&
+                       !_checkedProducts.contains(p.id);
+              }).toList();
+              if (productsToCheck.isNotEmpty && !_isCheckingAllWishlist) {
+                _checkSearchResultsWishlist(productsToCheck);
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      // Fallback: lọc từ provider nếu API lỗi
+      if (mounted) {
+        final allProducts = context.read<ProductProvider>().products;
+        List<Product> filtered = List.from(allProducts);
+
+        // Lọc theo từ khóa
+        if (_currentQuery.isNotEmpty) {
+          filtered = filtered.where((p) {
+            return p.title.toLowerCase().contains(_currentQuery);
+          }).toList();
+        }
+
+        // Lọc theo category
+        if (_currentFilter.categoryId != null) {
+          filtered = filtered.where((p) {
+            return p.categoryId == _currentFilter.categoryId.toString();
+          }).toList();
+        }
+
+        // Lọc theo giá
+        if (_currentFilter.minPrice != null) {
+          filtered = filtered.where((p) => p.price >= _currentFilter.minPrice!).toList();
+        }
+        if (_currentFilter.maxPrice != null) {
+          filtered = filtered.where((p) => p.price <= _currentFilter.maxPrice!).toList();
+        }
+
+        // Lọc theo rating
+        if (_currentFilter.minRating != null) {
+          filtered = filtered.where((p) {
+            return p.rating != null && p.rating! >= _currentFilter.minRating!;
+          }).toList();
+        }
+
+        // Sắp xếp
+        if (_currentFilter.sort != null) {
+          switch (_currentFilter.sort) {
+            case 'price_asc':
+              filtered.sort((a, b) => a.price.compareTo(b.price));
+              break;
+            case 'price_desc':
+              filtered.sort((a, b) => b.price.compareTo(a.price));
+              break;
+            case 'rating_desc':
+              filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+              break;
+            case 'name_asc':
+              filtered.sort((a, b) => a.title.compareTo(b.title));
+              break;
+          }
+        }
+
+        setState(() {
+          _searchResults = filtered;
+          _isLoading = false;
+        });
+        // Check wishlist status for all products (only check products that haven't been checked yet)
+        // Use a small delay to avoid checking during setState rebuild
+        if (!_isPostFrameCallbackPending) {
+          _isPostFrameCallbackPending = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _isPostFrameCallbackPending = false;
+            if (mounted) {
+              final productsToCheck = filtered.where((p) {
+                return !_wishlistStatus.containsKey(p.id) && 
+                       _checkingWishlist[p.id] != true &&
+                       !_checkedProducts.contains(p.id);
+              }).toList();
+              if (productsToCheck.isNotEmpty && !_isCheckingAllWishlist) {
+                _checkSearchResultsWishlist(productsToCheck);
+              }
+            }
+          });
+        }
+      }
     }
+  }
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) setState(() => _isLoading = false);
+  // Check wishlist status for search results
+  Future<void> _checkSearchResultsWishlist(List<Product> products) async {
+    if (!mounted || products.isEmpty || _isCheckingAllWishlist) return;
+    
+    // Filter out products that already have status or are being checked
+    final productsToCheck = products.where((p) {
+      return !_wishlistStatus.containsKey(p.id) && 
+             _checkingWishlist[p.id] != true &&
+             !_checkedProducts.contains(p.id);
+    }).toList();
+    
+    if (productsToCheck.isEmpty) return; // Nothing to check
+    
+    _isCheckingAllWishlist = true;
+    
+    try {
+      final wishlistService = context.read<WishlistService>();
+      final Map<String, bool> newStatuses = {};
+      
+      // Check all products in parallel, but only once
+      final futures = productsToCheck.map((product) async {
+        // Double-check to avoid race conditions
+        if (_wishlistStatus.containsKey(product.id) || 
+            _checkingWishlist[product.id] == true ||
+            _checkedProducts.contains(product.id)) {
+          return;
+        }
+        
+        try {
+          final isInWishlist = await wishlistService.checkInWishlist(product.id);
+          // Only add if still mounted and product hasn't been checked by another operation
+          if (mounted && !_wishlistStatus.containsKey(product.id) && !_checkedProducts.contains(product.id)) {
+            newStatuses[product.id] = isInWishlist;
+            _checkedProducts.add(product.id); // Mark as checked
+          }
+        } catch (e) {
+          // Silent fail - just don't set the status
+          print("Error checking wishlist for ${product.id}: $e");
+        }
+      }).toList();
+      
+      await Future.wait(futures);
+      
+      // Update all statuses in a single setState to avoid multiple rebuilds
+      if (mounted && newStatuses.isNotEmpty) {
+        setState(() {
+          _wishlistStatus.addAll(newStatuses);
+        });
+      }
+    } finally {
+      if (mounted) {
+        _isCheckingAllWishlist = false;
+      }
+    }
+  }
+
+  // Toggle wishlist for a specific product
+  Future<void> _toggleWishlist(String productId) async {
+    if (!mounted) return;
+    
+    // Prevent multiple simultaneous toggles for the same product
+    if (_checkingWishlist[productId] == true) return;
+    
+    final currentStatus = _wishlistStatus[productId] ?? false;
+    
+    // Mark product as checked to prevent re-checking after toggle
+    _checkedProducts.add(productId);
+    
+    // Optimistically update UI first
+    setState(() {
+      _checkingWishlist[productId] = true;
+      _wishlistStatus[productId] = !currentStatus; // Update immediately
     });
+
+    try {
+      final wishlistService = context.read<WishlistService>();
+      if (currentStatus) {
+        await wishlistService.removeFromWishlist(productId);
+        // Status already updated optimistically, no need to update again
+      } else {
+        await wishlistService.addToWishlist(productId);
+        // Status already updated optimistically, no need to update again
+      }
+    } catch (e) {
+      print("Error toggling wishlist for $productId: $e");
+      // Revert on error
+      if (mounted) {
+        setState(() {
+          _wishlistStatus[productId] = currentStatus; // Revert to original status
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentStatus
+                  ? 'Lỗi khi xóa khỏi yêu thích'
+                  : 'Lỗi khi thêm vào yêu thích',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checkingWishlist[productId] = false;
+        });
+      }
+    }
+  }
+
+  void _showFilterSheet() {
+    final categories = context.read<CategoryProvider>().categories;
+    final categoryList = categories.map((c) => {
+      'id': int.tryParse(c.id) ?? 0,
+      'name': c.name,
+    }).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: ProductFilterSheet(
+          initialFilter: _currentFilter,
+          categories: categoryList,
+          onApply: (filter) {
+            setState(() => _currentFilter = filter);
+            _performSearch(_searchController.text);
+          },
+        ),
+      ),
+    );
   }
 
   // AppBar có ô tìm kiếm
@@ -85,7 +336,7 @@ class _SearchScreenState extends State<SearchScreen> {
         controller: _searchController,
         autofocus: true,
         decoration: InputDecoration(
-          hintText: "Tìm kiếm sản phẩm...",
+          hintText: AppLocalizations.of(context)!.searchPlaceholder,
           hintStyle: TextStyle(
             color: kSecondaryTextColor.withOpacity(0.7),
             fontSize: 15,
@@ -128,12 +379,26 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
       actions: [
-        IconButton(
-          icon: Icon(Icons.filter_list_alt, color: kTextColor.withOpacity(0.8)),
-          onPressed: () {
-            // TODO: Bộ lọc
-            print("Nhấn nút Bộ lọc");
-          },
+        Stack(
+          children: [
+            IconButton(
+              icon: Icon(Icons.filter_list_alt, color: Colors.white),
+              onPressed: _showFilterSheet,
+            ),
+            if (_currentFilter.hasFilters)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: kDefaultPadding / 2),
       ],
@@ -147,30 +412,130 @@ class _SearchScreenState extends State<SearchScreen> {
         horizontal: kDefaultPadding,
         vertical: kDefaultPadding,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Flexible(
-            child: Text(
-              _currentQuery.isEmpty
-                  ? "Hiển thị tất cả sản phẩm"
-                  : 'Kết quả cho "${_searchController.text}"',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: kTextColor,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  _currentQuery.isEmpty
+                      ? "Hiển thị tất cả sản phẩm"
+                      : 'Kết quả cho "${_searchController.text}"',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: kTextColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
+              if (!_isLoading)
+                Text(
+                  "${_searchResults.length} kết quả",
+                  style: const TextStyle(fontSize: 13, color: kSecondaryTextColor),
+                ),
+            ],
           ),
-          if (!_isLoading)
-            Text(
-              "${_searchResults.length} kết quả",
-              style: const TextStyle(fontSize: 13, color: kSecondaryTextColor),
+          // Hiển thị các filter đang áp dụng
+          if (_currentFilter.hasFilters) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (_currentFilter.categoryId != null)
+                  _buildFilterChip(
+                    'Danh mục',
+                    () => setState(() {
+                      _currentFilter = _currentFilter.copyWith(clearCategory: true);
+                      _performSearch(_searchController.text);
+                    }),
+                  ),
+                if (_currentFilter.minPrice != null || _currentFilter.maxPrice != null)
+                  _buildFilterChip(
+                    'Giá: ${_currency.format(_currentFilter.minPrice ?? 0)} - ${_currency.format(_currentFilter.maxPrice ?? 100000000)}',
+                    () => setState(() {
+                      _currentFilter = _currentFilter.copyWith(
+                        clearMinPrice: true,
+                        clearMaxPrice: true,
+                      );
+                      _performSearch(_searchController.text);
+                    }),
+                  ),
+                if (_currentFilter.minRating != null)
+                  _buildFilterChip(
+                    '⭐ ${_currentFilter.minRating}+',
+                    () => setState(() {
+                      _currentFilter = _currentFilter.copyWith(clearMinRating: true);
+                      _performSearch(_searchController.text);
+                    }),
+                  ),
+                if (_currentFilter.sort != null)
+                  _buildFilterChip(
+                    _getSortLabel(_currentFilter.sort!),
+                    () => setState(() {
+                      _currentFilter = _currentFilter.copyWith(clearSort: true);
+                      _performSearch(_searchController.text);
+                    }),
+                  ),
+              ],
             ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildFilterChip(String label, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: kPrimaryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kPrimaryColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: kPrimaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(
+              Icons.close,
+              size: 14,
+              color: kPrimaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getSortLabel(String sort) {
+    switch (sort) {
+      case 'price_asc':
+        return 'Giá thấp → cao';
+      case 'price_desc':
+        return 'Giá cao → thấp';
+      case 'rating_desc':
+        return 'Đánh giá cao';
+      case 'name_asc':
+        return 'Tên A-Z';
+      case 'newest':
+        return 'Mới nhất';
+      default:
+        return sort;
+    }
   }
 
   // Lưới kết quả
@@ -184,10 +549,88 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_searchResults.isEmpty && _currentQuery.isNotEmpty) {
-      return const Center(child: Text("Không tìm thấy sản phẩm phù hợp."));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(kLargePadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.search_off_outlined,
+                  size: 64,
+                  color: kPrimaryColor.withOpacity(0.5),
+                ),
+              ),
+              const SizedBox(height: kLargePadding),
+              Text(
+                AppLocalizations.of(context)!.noResults,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: kTextColor,
+                ),
+              ),
+              const SizedBox(height: kSmallPadding),
+              Text(
+                "Thử tìm kiếm với từ khóa khác",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: kSecondaryTextColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
     if (_searchResults.isEmpty && _currentQuery.isEmpty) {
-      return const Center(child: Text("Nhập từ khóa để bắt đầu tìm kiếm."));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(kLargePadding),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.search_outlined,
+                  size: 64,
+                  color: kPrimaryColor.withOpacity(0.5),
+                ),
+              ),
+              const SizedBox(height: kLargePadding),
+              const Text(
+                "Tìm kiếm sản phẩm",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: kTextColor,
+                ),
+              ),
+              const SizedBox(height: kSmallPadding),
+              Text(
+                AppLocalizations.of(context)!.searchPlaceholder,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: kSecondaryTextColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return GridView.builder(
@@ -223,15 +666,8 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.08),
-              spreadRadius: 1,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(kBorderRadius),
+          boxShadow: kCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,21 +723,45 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                     ),
                   ),
+                  // Wishlist button
                   Positioned(
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () => print(
-                        "Chuyển trạng thái yêu thích: ${product.title}",
-                      ),
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.white.withOpacity(0.8),
-                        child: Icon(
-                          Icons.favorite_border,
-                          color: kHeartColor,
-                          size: 18,
+                      onTap: () => _toggleWishlist(product.id),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
+                        child: _checkingWishlist[product.id] == true
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    kHeartColor,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                (_wishlistStatus[product.id] ?? false)
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: (_wishlistStatus[product.id] ?? false)
+                                    ? kHeartColor
+                                    : kHeartColor.withOpacity(0.6),
+                                size: 18,
+                              ),
                       ),
                     ),
                   ),
@@ -329,38 +789,43 @@ class _SearchScreenState extends State<SearchScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Giá + badge giảm giá
-                      Row(
-                        children: [
-                          Text(
-                            _currency.format(
-                              product.finalPrice ?? product.price,
-                            ),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: kPrimaryColor,
-                              fontSize: 15,
-                            ),
-                          ),
-                          if (hasDiscount)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                      Flexible(
+                        child: Row(
+                          children: [
+                            Flexible(
                               child: Text(
-                                '-${product.discountPercentage!.toInt()}%',
+                                _currency.format(
+                                  product.finalPrice ?? product.price,
+                                ),
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimaryColor,
+                                  fontSize: 15,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (hasDiscount)
+                              Container(
+                                margin: const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '-${product.discountPercentage!.toInt()}%',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                       // Rating (nếu có)
                       if (product.rating != null)
@@ -399,11 +864,16 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: _buildSearchBar(context),
-      body: Column(
-        children: [
-          _buildResultHeader(),
-          Expanded(child: _buildSearchResultsGrid(context)),
-        ],
+      body: RefreshIndicator(
+        onRefresh: () => _performSearch(_searchController.text),
+        color: kPrimaryColor,
+        backgroundColor: Colors.white,
+        child: Column(
+          children: [
+            _buildResultHeader(),
+            Expanded(child: _buildSearchResultsGrid(context)),
+          ],
+        ),
       ),
     );
   }

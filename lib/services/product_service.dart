@@ -6,10 +6,35 @@ class ProductService {
   final Dio _dio;
   ProductService(this._dio);
 
-  // Lấy danh sách sản phẩm
-  Future<List<Product>> getProducts() async {
+  // Lấy danh sách sản phẩm với bộ lọc
+  Future<List<Product>> getProducts({
+    int? categoryId,
+    String? categoryIdString, // Thêm parameter cho string ID
+    String? storeId, // Thêm store_id filter
+    double? minPrice,
+    double? maxPrice,
+    double? minRating,
+    String? search,
+    String? sort,
+  }) async {
     try {
-      final response = await _dio.get('/products');
+      final queryParams = <String, dynamic>{};
+      // Ưu tiên dùng categoryIdString nếu có (vì backend nhận string)
+      if (categoryIdString != null && categoryIdString.isNotEmpty) {
+        queryParams['category_id'] = categoryIdString;
+      } else if (categoryId != null) {
+        queryParams['category_id'] = categoryId.toString();
+      }
+      if (storeId != null && storeId.isNotEmpty) {
+        queryParams['store_id'] = storeId;
+      }
+      if (minPrice != null) queryParams['min_price'] = minPrice;
+      if (maxPrice != null) queryParams['max_price'] = maxPrice;
+      if (minRating != null) queryParams['min_rating'] = minRating;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+      if (sort != null) queryParams['sort'] = sort;
+
+      final response = await _dio.get('/products', queryParameters: queryParams);
       final List<dynamic> data = response.data;
       return data.map((json) => Product.fromJson(json)).toList();
     } on DioException catch (e) {

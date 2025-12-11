@@ -70,9 +70,15 @@ class CategoriesScreen extends StatelessWidget {
     final categories = categoryProvider.categories;
 
     // --- Danh sách danh mục ---
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
-      itemCount: categories.length,
+    return RefreshIndicator(
+      onRefresh: () async {
+        await context.read<CategoryProvider>().fetchCategories();
+      },
+      color: kPrimaryColor,
+      backgroundColor: Colors.white,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: kDefaultPadding / 2),
+        itemCount: categories.length,
       separatorBuilder: (context, index) => Divider(
         height: 1,
         thickness: 1,
@@ -149,6 +155,7 @@ class CategoriesScreen extends StatelessWidget {
           splashColor: kPrimaryColor.withOpacity(0.1),
         );
       },
+      ),
     );
   }
 }

@@ -6,7 +6,7 @@ import 'package:app_links/app_links.dart';
 
 import 'package:ecom_frontend/providers/auth_provider.dart';
 import 'package:ecom_frontend/screens/auth/login_screen.dart';
-import 'package:ecom_frontend/screens/home/home_screen.dart';
+import 'package:ecom_frontend/screens/role_based_main_screen.dart';
 import 'package:ecom_frontend/screens/payment/payment_result_screen.dart';
 
 class AppWrapper extends StatefulWidget {
@@ -111,11 +111,10 @@ class _AppWrapperState extends State<AppWrapper> {
       builder: (context, authProvider, _) {
         switch (authProvider.authStatus) {
           case AuthStatus.authenticated:
-            return const MainScreenWrapper();
+            return const RoleBasedMainScreen();
           case AuthStatus.unauthenticated:
             return const LoginScreen();
           case AuthStatus.unknown:
-          default:
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );

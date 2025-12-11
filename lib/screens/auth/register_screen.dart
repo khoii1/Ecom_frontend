@@ -5,6 +5,7 @@ import 'package:ecom_frontend/utils/constants.dart';
 import 'package:ecom_frontend/widgets/custom_text_field.dart';
 import 'package:ecom_frontend/widgets/primary_button.dart';
 import 'package:provider/provider.dart';
+import 'package:ecom_frontend/l10n/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -20,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  /// Vai trò người dùng chọn (USER/SELLER)
+  /// Vai trò người dùng chọn (USER/SELLER/SHIPPER)
   String _selectedRole = 'USER';
 
   Future<void> _register() async {
@@ -71,6 +72,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (error == null) {
       // Đăng ký thành công → chuyển sang nhập OTP để xác thực email
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.",
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -81,11 +93,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } else {
+      // Đăng ký thất bại - hiển thị lỗi
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -162,6 +176,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     DropdownMenuItem(
                       value: 'SELLER',
                       child: Text('Người bán (Cửa hàng)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'SHIPPER',
+                      child: Text('Shipper (Giao hàng)'),
                     ),
                   ],
                   onChanged: (String? newValue) {
